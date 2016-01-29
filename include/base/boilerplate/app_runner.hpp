@@ -18,8 +18,8 @@ GGJ16_NAMESPACE
             std::unique_ptr<T> _app;
 
         public:
-            inline app_runner(
-                const std::string& title, ssvu::SizeT width, ssvu::SizeT height)
+            inline app_runner(const std::string& title, ssvu::SizeT width,
+                ssvu::SizeT height) noexcept
             {
                 _window.setTitle(title);
                 _window.setTimer<ssvs::TimerStatic>(0.5f, 0.5f);
@@ -30,10 +30,16 @@ GGJ16_NAMESPACE
                 _window.setPixelMult(2);
 
                 _app = std::make_unique<T>(_window);
-
                 _window.setGameState(_app->state());
-                _window.run();
             }
+
+            inline auto& app() noexcept
+            {
+                VRM_CORE_ASSERT_OP(_app, !=, nullptr);
+                return *_app;
+            }
+
+            inline void run() noexcept { _window.run(); }
         };
     }
 }
