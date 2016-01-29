@@ -8,8 +8,10 @@
 GGJ16_NAMESPACE
 {
     namespace vrmc = vrm::core;
+    namespace BTR = ssvs::BTR;
 
     using ft = ssvu::FT;
+    using sfc = sf::Color;
 
     using vrm::core::uint;
     using vrm::core::sz_t;

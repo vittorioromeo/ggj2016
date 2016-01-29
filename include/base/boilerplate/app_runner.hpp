@@ -35,7 +35,7 @@ GGJ16_NAMESPACE
 
             inline auto& app() noexcept
             {
-                VRM_CORE_ASSERT_OP(_app, !=, nullptr);
+                VRM_CORE_ASSERT_OP(_app.get(), !=, nullptr);
                 return *_app;
             }
 
