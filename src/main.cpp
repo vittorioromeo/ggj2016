@@ -1,6 +1,12 @@
 #include <iostream>
 #include "base.hpp"
 #include "game.hpp"
+#include "battle.hpp"
+
+// Battle system process:
+// 1. Every party member selects a ritual
+// 2. Ritual minigames are executed
+// 3.
 
 GGJ16_NAMESPACE
 {
@@ -12,7 +18,10 @@ GGJ16_NAMESPACE
     public:
         test_screen(game_app& app) noexcept : base_type(app) {}
 
-        void update(ft dt) override { std::cout << "Ping! " << dt << "\n"; }
+        void update(ft dt) override
+        {
+            // std::cout << "Ping! " << dt << "\n";
+        }
     };
 }
 GGJ16_NAMESPACE_END

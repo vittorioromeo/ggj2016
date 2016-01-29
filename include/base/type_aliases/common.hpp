@@ -1,11 +1,14 @@
 #pragma once
 
 #include <vrm/core/type_aliases.hpp>
+#include <vrm/core/tuple_utils.hpp>
 #include <SSVStart/Global/Typedefs.hpp>
 #include <SSVStart/Input/Input.hpp>
 
 GGJ16_NAMESPACE
 {
+    namespace vrmc = vrm::core;
+
     using ft = ssvu::FT;
 
     using vrm::core::uint;
