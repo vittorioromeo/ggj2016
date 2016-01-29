@@ -20,44 +20,98 @@ GGJ16_NAMESPACE
         battle_menu _menu;
         battle_menu_gfx_state _menu_gfx_state;
 
-    public:
-        battle_screen(game_app& app) noexcept : base_type(app)
+        battle_menu_screen* _m_main;
+        battle_menu_screen* _m_ritual;
+        battle_menu_screen* _m_item;
+
+        battle _battle;
+
+        void fill_ritual_menu()
         {
-            auto& ms(_menu.make_screen());
-            auto& ms_inner(_menu.make_screen());
+            auto& m(*_m_ritual);
+            m.clear();
 
-            ms.emplace_choice("hi", [](auto&)
+            m.emplace_choice("Ritual 0", [](auto&)
                 {
                 });
-            ms.emplace_choice("go fwd", [&ms_inner](auto& bm)
-                {
-                    bm.push_screen(ms_inner);
-                });
-
-            ms_inner.emplace_choice("bye", [](auto&)
+            m.emplace_choice("Ritual 1", [](auto&)
                 {
                 });
-            ms_inner.emplace_choice("ads", [](auto&)
+            m.emplace_choice("Ritual 2", [](auto&)
                 {
                 });
-            ms_inner.emplace_choice("go back", [](auto& bm)
+            m.emplace_choice("Go back", [](auto& bm)
                 {
                     bm.pop_screen();
                 });
+        }
+
+        void fill_item_menu()
+        {
+            auto& m(*_m_item);
+            m.clear();
+
+            m.emplace_choice("Item 0", [](auto&)
+                {
+                });
+            m.emplace_choice("Item 1", [](auto&)
+                {
+                });
+            m.emplace_choice("Item 2", [](auto&)
+                {
+                });
+            m.emplace_choice("Go back", [](auto& bm)
+                {
+                    bm.pop_screen();
+                });
+        }
+
+        void fill_main_menu()
+        {
+            auto& m(*_m_main);
+            m.clear();
+
+            m.emplace_choice("Perform ritual", [this](auto& bm)
+                {
+                    this->fill_ritual_menu();
+                    bm.push_screen(*_m_ritual);
+                });
+            m.emplace_choice("Use item", [this](auto& bm)
+                {
+                    this->fill_item_menu();
+                    bm.push_screen(*_m_item);
+                });
+        }
+
+        void init_menu()
+        {
+            _m_main = &_menu.make_screen();
+            _m_ritual = &_menu.make_screen();
+            _m_item = &_menu.make_screen();
+
+            fill_main_menu();
 
             _menu.on_change += [this]
             {
                 _menu_gfx_state.rebuild_from(_menu);
             };
 
-            _menu.push_screen(ms);
+            _menu.push_screen(*_m_main);
         }
 
-        void update(ft dt) override
+        void update_menu(ft dt) { _menu_gfx_state.update(app(), _menu, dt); }
+        void draw_menu() { _menu_gfx_state.draw(app().window()); }
+
+    public:
+        battle_screen(game_app& app, const battle& battle) noexcept
+            : base_type(app),
+              _battle{battle}
         {
-            _menu_gfx_state.update(app(), _menu, dt);
+            init_menu();
         }
-        void draw() override { _menu_gfx_state.draw(app().window()); }
+
+        void update(ft dt) override { update_menu(dt); }
+        void draw() override { draw_menu(); }
     };
 }
 GGJ16_NAMESPACE_END
@@ -68,10 +122,28 @@ int main()
 
     using game_app_runner = boilerplate::app_runner<game_app>;
     game_app_runner game{"ggj2016 temp", 320, 240};
-
     game_app& app(game.app());
-    auto& my_test_screen(app.make_screen<battle_screen>());
-    app.push_screen(my_test_screen);
+
+    character_stats cs0;
+    cs0.health() = 100;
+    cs0.shield() = 40;
+    cs0.power() = 10;
+    cs0.defense() = 5;
+    cs0.favour() = 10;
+    battle_participant b0{cs0};
+
+    character_stats cs1;
+    cs1.health() = 100;
+    cs1.shield() = 40;
+    cs1.power() = 10;
+    cs1.defense() = 5;
+    cs1.favour() = 10;
+    battle_participant b1{cs1};
+
+    battle b{b0, b1};
+
+    auto& test_battle(app.make_screen<battle_screen>(b));
+    app.push_screen(test_battle);
 
     game.run();
     return 0;
