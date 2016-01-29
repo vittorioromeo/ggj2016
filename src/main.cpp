@@ -26,19 +26,24 @@ GGJ16_NAMESPACE
 
         battle _battle;
 
+        void execute_ritual() {}
+
         void fill_ritual_menu()
         {
             auto& m(*_m_ritual);
             m.clear();
 
-            m.emplace_choice("Ritual 0", [](auto&)
+            m.emplace_choice("Ritual 0", [this](auto&)
                 {
+                    this->execute_ritual();
                 });
-            m.emplace_choice("Ritual 1", [](auto&)
+            m.emplace_choice("Ritual 1", [this](auto&)
                 {
+                    this->execute_ritual();
                 });
-            m.emplace_choice("Ritual 2", [](auto&)
+            m.emplace_choice("Ritual 2", [this](auto&)
                 {
+                    this->execute_ritual();
                 });
             m.emplace_choice("Go back", [](auto& bm)
                 {
@@ -51,13 +56,13 @@ GGJ16_NAMESPACE
             auto& m(*_m_item);
             m.clear();
 
-            m.emplace_choice("Item 0", [](auto&)
+            m.emplace_choice("Item 0", [this](auto&)
                 {
                 });
-            m.emplace_choice("Item 1", [](auto&)
+            m.emplace_choice("Item 1", [this](auto&)
                 {
                 });
-            m.emplace_choice("Item 2", [](auto&)
+            m.emplace_choice("Item 2", [this](auto&)
                 {
                 });
             m.emplace_choice("Go back", [](auto& bm)
@@ -108,6 +113,14 @@ GGJ16_NAMESPACE
               _battle{battle}
         {
             init_menu();
+
+            // Assume player starts
+            if(true)
+            {
+            }
+            else
+            {
+            }
         }
 
         void update(ft dt) override { update_menu(dt); }
@@ -131,6 +144,7 @@ int main()
     cs0.defense() = 5;
     cs0.favour() = 10;
     battle_participant b0{cs0};
+    cplayer_state ps;
 
     character_stats cs1;
     cs1.health() = 100;
@@ -140,7 +154,7 @@ int main()
     cs1.favour() = 10;
     battle_participant b1{cs1};
 
-    battle b{b0, b1};
+    battle b{ps, b0, b1};
 
     auto& test_battle(app.make_screen<battle_screen>(b));
     app.push_screen(test_battle);
