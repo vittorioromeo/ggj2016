@@ -34,8 +34,8 @@ GGJ16_NAMESPACE
         GGJ16_DEFINE_STAT_ACCESSOR(health, stat_type::health)
         GGJ16_DEFINE_STAT_ACCESSOR(shield, stat_type::shield)
         GGJ16_DEFINE_STAT_ACCESSOR(power, stat_type::power)
-        GGJ16_DEFINE_STAT_ACCESSOR(defense, stat_type::defense)
-        GGJ16_DEFINE_STAT_ACCESSOR(favour, stat_type::favour)
+        GGJ16_DEFINE_STAT_ACCESSOR(maxhealth, stat_type::maxhealth)
+        GGJ16_DEFINE_STAT_ACCESSOR(maxshield, stat_type::maxshield)
     };
 }
 GGJ16_NAMESPACE_END

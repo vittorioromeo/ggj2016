@@ -10,8 +10,8 @@ GGJ16_NAMESPACE
         health = 0,
         shield = 1,
         power = 2,
-        defense = 3,
-        favour = 4
+        maxhealth = 3,
+        maxshield = 4
     };
 
     constexpr sz_t stat_count{5};

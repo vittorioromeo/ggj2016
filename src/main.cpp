@@ -651,6 +651,72 @@ GGJ16_NAMESPACE
         }
     };
 
+    class stat_bar : public sf::Transformable, public sf::Drawable
+    {
+    private:
+        ssvs::BitmapText _txt{mkTxtOBSmall()};
+        sf::RectangleShape _bar, _bar_outl;
+
+        static constexpr float _bar_h{40.f};
+        static constexpr float _bar_w_max{200.f};
+
+    public:
+        stat_bar(sf::Color bar_color)
+        {
+            _bar.setOutlineColor(sfc::White);
+            _bar.setOutlineThickness(2);
+            _bar.setFillColor(bar_color);
+
+            _bar_outl.setOutlineColor(sfc::White);
+            _bar_outl.setOutlineThickness(2);
+            _bar_outl.setFillColor(sfc::Transparent);
+
+            _txt.setScale(vec2f(3.f, 3.f));
+        }
+
+        void refresh(float value, float maxvalue)
+        {
+            auto width(value / maxvalue * _bar_w_max);
+            _bar.setSize(vec2f(width, _bar_h));
+            _bar_outl.setSize(vec2f(_bar_w_max, _bar_h));
+
+            _txt.setString(std::to_string((int)value) + std::string{" / "} +
+                           std::to_string((int)maxvalue));
+            _txt.setPosition(_bar.getPosition());
+        }
+
+        virtual void draw(
+            sf::RenderTarget& target, sf::RenderStates states) const
+        {
+            states.transform *= getTransform();
+            target.draw(_bar_outl, states);
+            target.draw(_bar, states);
+            target.draw(_txt, states);
+        }
+    };
+
+    struct stats_gfx : public sf::Transformable, public sf::Drawable
+    {
+        stat_bar _health_b{sfc::Red};
+        stat_bar _shield_b{sfc::Blue};
+
+        stats_gfx() { _shield_b.setPosition(0, 60.f); }
+
+        virtual void draw(
+            sf::RenderTarget& target, sf::RenderStates states) const
+        {
+            states.transform *= getTransform();
+            target.draw(_health_b, states);
+            target.draw(_shield_b, states);
+        }
+
+        void refresh(const character_stats& cs)
+        {
+            _health_b.refresh(cs.health(), cs.maxhealth());
+            _shield_b.refresh(cs.shield(), cs.maxshield());
+        }
+    };
+
     class battle_screen : public game_screen
     {
     public:
@@ -705,6 +771,9 @@ GGJ16_NAMESPACE
         sf::RectangleShape _stats_bg;
         sf::RectangleShape _menu_bg;
 
+        stats_gfx _player_stats_gfx;
+        stats_gfx _enemy_stats_gfx;
+
         void init_menu_bg()
         {
             auto sw(350.f);
@@ -717,6 +786,10 @@ GGJ16_NAMESPACE
             _menu_bg.setSize(vec2f{game_constants::width - sw, h});
             _menu_bg.setFillColor(sf::Color{35, 35, 35, 255});
             _menu_bg.setPosition(vec2f{sw, game_constants::height - h});
+
+            _player_stats_gfx.setPosition(
+                vec2f{20.f, game_constants::height - h + 20.f});
+            _enemy_stats_gfx.setPosition(vec2f{20.f, 20.f});
         }
 
         void init_cs_text()
@@ -928,13 +1001,25 @@ GGJ16_NAMESPACE
         }
 
 
+        void update_stat_bars()
+        {
+            _player_stats_gfx.refresh(_battle_context.player().stats());
+            _enemy_stats_gfx.refresh(_battle_context.enemy().stats());
+        }
+
 
         void update_menu(ft dt) { _menu_gfx_state.update(app(), _menu, dt); }
         void draw_menu()
         {
-            app().render(_stats_bg);
             app().render(_menu_bg);
             _menu_gfx_state.draw(app().window());
+        }
+
+        void draw_stats_bars()
+        {
+            app().render(_stats_bg);
+            app().render(_player_stats_gfx);
+            app().render(_enemy_stats_gfx);
         }
 
         void update_ritual(ft dt)
@@ -1164,6 +1249,8 @@ GGJ16_NAMESPACE
         {
             // ssvu::lo() << app().mp() << "\n";
 
+            update_stat_bars();
+
             if(!_scripted_events.empty())
             {
                 update_scripted_events(dt);
@@ -1206,21 +1293,21 @@ GGJ16_NAMESPACE
                 return;
             }
 
+
+
             if(_state == battle_screen_state::player_menu)
             {
-                //  _hud_camera.apply();
                 draw_menu();
-                //  _hud_camera.unapply();
+                draw_stats_bars();
             }
             else if(_state == battle_screen_state::player_ritual)
             {
-                //  _hud_camera.apply();
                 draw_ritual();
-                //  _hud_camera.unapply();
             }
             else if(_state == battle_screen_state::enemy_turn)
             {
                 draw_enemy();
+                draw_stats_bars();
             }
         }
     };
@@ -1240,16 +1327,16 @@ int main()
     cs0.health() = 100;
     cs0.shield() = 40;
     cs0.power() = 10;
-    cs0.defense() = 5;
-    cs0.favour() = 10;
+    cs0.maxhealth() = 100;
+    cs0.maxshield() = 40;
     battle_participant b0{cs0};
 
     character_stats cs1;
     cs1.health() = 100;
     cs1.shield() = 40;
     cs1.power() = 10;
-    cs1.defense() = 5;
-    cs1.favour() = 10;
+    cs1.maxhealth() = 100;
+    cs1.maxshield() = 40;
     battle_participant b1{cs1};
 
     cplayer_state ps;
