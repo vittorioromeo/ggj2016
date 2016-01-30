@@ -1,7 +1,8 @@
 {
     "textures":
     [
-        
+        "fontObStroked.png",
+        "fontObBig.png"
     ],
     "soundBuffers":
     [   

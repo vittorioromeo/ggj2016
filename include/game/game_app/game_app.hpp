@@ -10,6 +10,8 @@ GGJ16_NAMESPACE
     {
     private:
         game_app& _app;
+        bool _pass_through{true};
+        float _opacity_block{175};
 
     public:
         game_screen(game_app& app) noexcept : _app(app) {}
@@ -20,6 +22,12 @@ GGJ16_NAMESPACE
         virtual void draw() {}
 
         auto& app() { return _app; }
+
+        void set_pass_through(bool x) noexcept { _pass_through = x; }
+        const auto& pass_through() const noexcept { return _pass_through; }
+
+        void set_opacity_block(float x) noexcept { _opacity_block = x; }
+        const auto& opacity_block() const noexcept { return _opacity_block; }
     };
 
     namespace impl
@@ -61,10 +69,45 @@ GGJ16_NAMESPACE
                 if(!has_any_screen()) return;
                 current_screen().update(dt);
             }
-            void draw() noexcept
+            void draw(sf::RenderTarget& rt) noexcept
             {
                 if(!has_any_screen()) return;
-                current_screen().draw();
+
+                std::vector<std::function<void()>> to_draw;
+                to_draw.emplace_back([this]
+                    {
+                        current_screen().draw();
+                    });
+
+                if(_screen_stack.size() > 1 && current_screen().pass_through())
+                {
+                    for(int i(_screen_stack.size() - 2); i >= 0; --i)
+                    {
+                        auto isc(_screen_stack[i]);
+
+                        sf::RectangleShape block;
+                        block.setPosition(vec2f(0, 0));
+                        block.setSize(vec2f(320, 240));
+                        block.setFillColor(
+                            sf::Color{0, 0, 0, isc->opacity_block()});
+
+                        to_draw.emplace_back([this, block, &rt]
+                            {
+                                rt.draw(block);
+                            });
+
+                        to_draw.emplace_back([this, isc]
+                            {
+                                isc->draw();
+                            });
+                    }
+                }
+
+                for(auto itr(std::rbegin(to_draw)); itr != std::rend(to_draw);
+                    ++itr)
+                {
+                    (*itr)();
+                }
             }
 
             template <typename T, typename... Ts>
@@ -75,7 +118,7 @@ GGJ16_NAMESPACE
                 auto uptr(std::make_unique<T>(FWD(xs)...));
                 _screen_storage.emplace_back(std::move(uptr));
                 auto ptr(_screen_storage.back().get());
-                return *vrm::core::to_derived<T>(ptr);
+                return *vrmc::to_derived<T>(ptr);
             }
 
             void push_screen(game_screen& screen)
@@ -107,7 +150,7 @@ GGJ16_NAMESPACE
 
             state().onDraw += [this]
             {
-                _screen_manager.draw();
+                _screen_manager.draw(window());
             };
         }
 

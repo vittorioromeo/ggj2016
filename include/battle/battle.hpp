@@ -12,6 +12,8 @@
 
 GGJ16_NAMESPACE
 {
+
+
     class cplayer_state
     {
     private:
@@ -21,18 +23,14 @@ GGJ16_NAMESPACE
     public:
     };
 
-    class battle
+    class battle_t
     {
     private:
-        cplayer_state& _player_state;
         battle_participant _player;
         battle_participant _enemy;
         bool _player_plays{true};
 
     public:
-        auto& player_state() noexcept { return _player_state; }
-        const auto& player_state() const noexcept { return _player_state; }
-
         auto& player() noexcept { return _player; }
         const auto& player() const noexcept { return _player; }
 
@@ -67,16 +65,18 @@ GGJ16_NAMESPACE
             _player_plays = !_player_plays;
         }
 
+
+    public:
+        battle_t(
+            const battle_participant& player, const battle_participant& enemy)
+            : _player{player}, _enemy{enemy}
+        {
+        }
+
         auto player_dead() { return _player.stats().health() < 0; }
         auto enemy_dead() { return _enemy.stats().health() < 0; }
         auto must_continue() { return !player_dead() && !enemy_dead(); }
-
-    public:
-        battle(cplayer_state& player_state, const battle_participant& player,
-            const battle_participant& enemy)
-            : _player_state{player_state}, _player{player}, _enemy{enemy}
-        {
-        }
+        auto is_player_turn() { return _player_plays; }
 
         void execute_battle()
         {
@@ -94,6 +94,25 @@ GGJ16_NAMESPACE
             {
             }
         }
+    };
+
+    class battle_context_t
+    {
+    private:
+        cplayer_state& _player_state;
+        battle_t _battle;
+
+    public:
+        battle_context_t(cplayer_state& player_state, const battle_t& battle)
+            : _player_state{player_state}, _battle{battle}
+        {
+        }
+
+        auto& player_state() noexcept { return _player_state; }
+        const auto& player_state() const noexcept { return _player_state; }
+
+        auto& battle() noexcept { return _battle; }
+        const auto& battle() const noexcept { return _battle; }
     };
 }
 GGJ16_NAMESPACE_END

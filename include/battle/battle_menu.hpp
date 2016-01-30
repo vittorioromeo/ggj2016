@@ -68,6 +68,7 @@ GGJ16_NAMESPACE
         std::vector<battle_menu_screen*> _screen_stack;
 
     public:
+        bool _was_pressed{false};
         ssvu::Delegate<void()> on_change;
 
         battle_menu()
@@ -115,9 +116,8 @@ GGJ16_NAMESPACE
     private:
         sf::RectangleShape _shape;
         ssvs::BitmapTextRich _tr{*assets().fontObStroked};
-        const battle_menu_choice& _bmc;
         vec2f _pos;
-        bool _was_pressed{false};
+        const battle_menu_choice& _bmc;
 
         auto is_hovered(game_app& app)
         {
@@ -153,15 +153,15 @@ GGJ16_NAMESPACE
 
             auto lbtn_down(app.window().getInputState()[ssvs::MBtn::Left]);
 
-            if(is_hovered(app) && !_was_pressed && lbtn_down)
+            if(is_hovered(app) && !bm._was_pressed && lbtn_down)
             {
-                _was_pressed = true;
+                bm._was_pressed = true;
                 _bmc.execute(bm);
             }
 
             if(!lbtn_down)
             {
-                _was_pressed = false;
+                bm._was_pressed = false;
             }
 
             _tr.setPosition(_pos);

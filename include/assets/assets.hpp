@@ -3,7 +3,6 @@
 #include "base.hpp"
 #include "assets/asset_loader.hpp"
 
-
 #define CACHE_ASSET_IMPL(mType, mName, mExt) \
     mType* mName{                            \
         &_asset_loader._asset_manager.get<mType>(VRM_PP_TOSTR(mName) mExt)};
@@ -74,6 +73,19 @@ GGJ16_NAMESPACE
     inline auto& assets() noexcept
     {
         static impl::assets result;
+        return result;
+    }
+
+    inline auto mkTxtOBSmall()
+    {
+        ssvs::BitmapText result{*assets().fontObStroked};
+        result.setTracking(-3);
+        return result;
+    }
+    inline auto mkTxtOBBig()
+    {
+        ssvs::BitmapText result{*assets().fontObBig};
+        result.setTracking(-1);
         return result;
     }
 }
