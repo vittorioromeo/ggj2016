@@ -437,24 +437,29 @@ GGJ16_NAMESPACE
         std::string _label;
         std::string _desc;
         ritual_type _type;
-        float _req_mana{0};
         float _time;
+        float _req_mana{0};
         std::function<ritual_uptr()> _fn_make;
         ritual_effect_fn _fn_effect;
 
     public:
         template <typename TF0, typename TF1>
         ritual_maker(const std::string& label, const std::string& desc,
-            ritual_type type, float time, TF0&& f, TF1&& f_eff)
-            : _label{label}, _desc{desc}, _type{type}, _time{time}, _fn_make(f),
-              _fn_effect(f_eff)
+            ritual_type type, float time, float req_mana, TF0&& f, TF1&& f_eff)
+            : _label{label}, _desc{desc}, _type{type}, _time{time},
+              _req_mana{req_mana}, _fn_make(f), _fn_effect(f_eff)
         {
         }
 
         const auto& type() const noexcept { return _type; }
         const auto& time() const noexcept { return _time; }
         const auto& label() const noexcept { return _label; }
-        const auto& desc() const noexcept { return _desc; }
+        auto desc() const noexcept
+        {
+            std::ostringstream oss;
+            oss << _desc << "\nTime: " << _time << "\tMana: " << _req_mana;
+            return oss.str();
+        }
 
         auto& req_mana() noexcept { return _req_mana; }
         const auto& req_mana() const noexcept { return _req_mana; }
@@ -467,6 +472,7 @@ GGJ16_NAMESPACE
 
     struct cenemy_state
     {
+        sf::Texture* _enemy_texture{assets().landscape};
         std::function<void(battle_screen&, battle_context_t&)> _f_ai;
     };
 
@@ -488,10 +494,10 @@ GGJ16_NAMESPACE
 
         template <typename T, typename TF0, typename TF1, typename... Ts>
         void emplace_atk_ritual(const std::string& label,
-            const std::string& desc, ritual_type rt, float time, TF0&& f_init,
-            TF1&& f_effect)
+            const std::string& desc, ritual_type rt, float time, float req_mana,
+            TF0&& f_init, TF1&& f_effect)
         {
-            _atk_rituals.emplace_back(label, desc, rt, time,
+            _atk_rituals.emplace_back(label, desc, rt, time, req_mana,
                 [f_init, rt]
                 {
                     auto uptr(std::make_unique<T>());
@@ -504,10 +510,10 @@ GGJ16_NAMESPACE
 
         template <typename T, typename TF0, typename TF1, typename... Ts>
         void emplace_utl_ritual(const std::string& label,
-            const std::string& desc, ritual_type rt, float time, TF0&& f_init,
-            TF1&& f_effect)
+            const std::string& desc, ritual_type rt, float time, float req_mana,
+            TF0&& f_init, TF1&& f_effect)
         {
-            _utl_rituals.emplace_back(label, desc, rt, time,
+            _utl_rituals.emplace_back(label, desc, rt, time, req_mana,
                 [f_init, rt]
                 {
                     auto uptr(std::make_unique<T>());
@@ -520,10 +526,10 @@ GGJ16_NAMESPACE
 
         template <typename T, typename TF0, typename TF1, typename... Ts>
         void emplace_mana_ritual(const std::string& label,
-            const std::string& desc, ritual_type rt, float time, TF0&& f_init,
-            TF1&& f_effect)
+            const std::string& desc, ritual_type rt, float time, float req_mana,
+            TF0&& f_init, TF1&& f_effect)
         {
-            _mana_rituals.emplace_back(label, desc, rt, time,
+            _mana_rituals.emplace_back(label, desc, rt, time, req_mana,
                 [f_init, rt]
                 {
                     auto uptr(std::make_unique<T>());
@@ -664,7 +670,7 @@ GGJ16_NAMESPACE
 
         sf::RectangleShape _bg;
         ssvs::BitmapTextRich _btr{*assets().fontObStroked};
-        float _safety_time{100};
+        float _safety_time{70};
 
         void init_bg()
         {
@@ -793,6 +799,8 @@ GGJ16_NAMESPACE
         void hide_mana() { _mana_visibile = false; }
     };
 
+
+
     class battle_screen : public game_screen
     {
     public:
@@ -809,7 +817,10 @@ GGJ16_NAMESPACE
             }
         };
 
+        sf::Sprite _landscape{*assets().landscape};
+        sf::Sprite _enemy;
 
+        float _enemy_shake{0};
 
         using base_type = game_screen;
 
@@ -839,6 +850,8 @@ GGJ16_NAMESPACE
         stats_gfx _player_stats_gfx;
         stats_gfx _enemy_stats_gfx;
 
+        vec2f _esprite_pos;
+
         void init_menu_bg()
         {
             auto sw(350.f);
@@ -856,6 +869,12 @@ GGJ16_NAMESPACE
                 vec2f{20.f, game_constants::height - h + 20.f});
             _enemy_stats_gfx.setPosition(vec2f{20.f, 20.f});
             _enemy_stats_gfx.hide_mana();
+
+            _enemy.setTexture(*_battle_context.enemy_state()._enemy_texture);
+            _enemy.setScale(vec2f(0.4f, 0.4f));
+            ssvs::setOrigin(_enemy, ssvs::getLocalCenter);
+            _esprite_pos = vec2f(game_constants::width / 2.f,
+                game_constants::height / 2.f - 75.f);
         }
 
         void init_cs_text()
@@ -959,6 +978,7 @@ GGJ16_NAMESPACE
             _state = battle_screen_state::player_ritual;
             auto time_as_ft(ssvu::getSecondsToFT(rm.time()));
             _ritual_ctx.set_and_start_minigame(time_as_ft, rm.make());
+            assets().psnd_one(assets().click0);
         }
 
         void fill_attack_menu()
@@ -979,6 +999,10 @@ GGJ16_NAMESPACE
                                 pst.mana() -= rr.req_mana();
                                 this->execute_ritual(rr);
                                 bm.pop_screen();
+                            }
+                            else
+                            {
+                                this->display_msg_box("Not enough mana.");
                             }
                         });
                 });
@@ -1008,6 +1032,10 @@ GGJ16_NAMESPACE
                                 this->execute_ritual(rr);
                                 bm.pop_screen();
                             }
+                            else
+                            {
+                                this->display_msg_box("Not enough mana.");
+                            }
                         });
                 });
 
@@ -1021,6 +1049,8 @@ GGJ16_NAMESPACE
         {
             auto& mbs(app().make_screen<msgbox_screen>());
             auto& btr(mbs.btr());
+
+            assets().psnd(assets().msgbox);
 
             btr.eff<BTR::Tracking>(-3).eff(sfc::White).in(s);
             app().push_screen(mbs);
@@ -1086,10 +1116,12 @@ GGJ16_NAMESPACE
         void ritual_failure()
         {
             app()._shake = 40;
+            assets().psnd_one(assets().failure);
             add_scripted_text(1.1f, "Failure!");
         }
         void ritual_success()
         {
+            assets().psnd_one(assets().success);
             add_scripted_text(1.1f, "Success!");
 
             _success_effect(_battle_context);
@@ -1138,7 +1170,6 @@ GGJ16_NAMESPACE
         void draw_ritual() { _ritual_ctx.draw(); }
 
         void update_enemy(ft) {}
-
         void draw_enemy() {}
 
         void update_scripted_events(ft dt)
@@ -1230,6 +1261,7 @@ GGJ16_NAMESPACE
                             return m_enemy_name();
                         },
                         be);
+                    _enemy_shake = be.e_damage()._amount * 5;
                     break;
 
                 case battle_event_type::player_damaged:
@@ -1239,6 +1271,7 @@ GGJ16_NAMESPACE
                             return m_player_name();
                         },
                         be);
+                    assets().psnd_one(assets().enemy_atk0, assets().enemy_atk1);
                     break;
 
                 case battle_event_type::enemy_shield_damaged:
@@ -1248,6 +1281,8 @@ GGJ16_NAMESPACE
                             return m_enemy_name();
                         },
                         be);
+
+                    _enemy_shake = be.e_damage()._amount * 3;
                     break;
 
                 case battle_event_type::player_shield_damaged:
@@ -1257,6 +1292,8 @@ GGJ16_NAMESPACE
                             return m_player_name();
                         },
                         be);
+
+                    assets().psnd_one(assets().enemy_atk0, assets().enemy_atk1);
                     break;
 
                 case battle_event_type::enemy_healed:
@@ -1266,6 +1303,8 @@ GGJ16_NAMESPACE
                             return m_enemy_name();
                         },
                         be);
+
+                    assets().psnd_one(assets().shield_up);
                     break;
 
                 case battle_event_type::player_healed:
@@ -1275,6 +1314,8 @@ GGJ16_NAMESPACE
                             return m_player_name();
                         },
                         be);
+
+                    assets().psnd_one(assets().shield_up);
                     break;
 
                 case battle_event_type::enemy_shield_healed:
@@ -1284,6 +1325,8 @@ GGJ16_NAMESPACE
                             return m_enemy_name();
                         },
                         be);
+
+                    assets().psnd_one(assets().shield_up);
                     break;
 
                 case battle_event_type::player_shield_healed:
@@ -1293,6 +1336,8 @@ GGJ16_NAMESPACE
                             return m_player_name();
                         },
                         be);
+
+                    assets().psnd_one(assets().shield_up);
                     break;
 
                 case battle_event_type::enemy_stunned:
@@ -1341,6 +1386,18 @@ GGJ16_NAMESPACE
         void update(ft dt) override
         {
             update_stat_bars();
+
+            if(_enemy_shake > 0)
+            {
+                _enemy_shake -= dt;
+                auto s(_enemy_shake);
+                vec2f offset(ssvu::getRndR(-s, s), ssvu::getRndR(-s, s));
+                _enemy.setPosition(_esprite_pos + offset);
+            }
+            else
+            {
+                _enemy_shake = 0;
+            }
 
             if(!_scripted_events.empty())
             {
@@ -1400,6 +1457,10 @@ GGJ16_NAMESPACE
 
         void draw() override
         {
+            app().render(_landscape);
+            app().render(_enemy);
+
+
             if(!_scripted_events.empty())
             {
                 draw_scripted_events();
@@ -1462,6 +1523,52 @@ GGJ16_NAMESPACE
         _tr.setPosition(ssvs::getGlobalCenter(_shape));
         _tr.update(dt);
     }
+
+    struct title_screen : public game_screen
+    {
+        ssvs::BitmapTextRich _t_cs{*assets().fontObBig};
+        ssvs::BitmapTextRich _t_cs2{*assets().fontObStroked};
+
+        std::function<void()> on_start;
+        title_screen(game_app& app) : game_screen(app)
+        {
+            _t_cs.eff<BTR::Tracking>(-3)
+                .eff(sfc::Red)
+                .eff<BTR::Wave>(1.5f, 0.03f)
+                .in("aborti morti");
+
+            _t_cs2.eff<BTR::Tracking>(-3)
+                .eff(sfc::White)
+                .eff<BTR::Wave>(1.0f, 0.02f)
+                .in("Press LMB to play.");
+
+            _t_cs.setScale(vec2f(3.f, 3.f));
+            _t_cs2.setScale(vec2f(3.f, 3.f));
+        }
+
+        void update(ft dt) override
+        {
+            if(app().lb_down()) on_start();
+
+            ssvs::setOrigin(_t_cs, ssvs::getLocalCenter);
+            ssvs::setOrigin(_t_cs2, ssvs::getLocalCenter);
+
+            _t_cs.setPosition(game_constants::width / 2.f,
+                game_constants::height / 2.f - 10.f);
+            _t_cs.update(dt);
+
+            _t_cs2.setPosition(game_constants::width / 2.f,
+                game_constants::height / 2.f + 30.f);
+
+            _t_cs2.update(dt);
+        }
+
+        void draw() override
+        {
+            app().render(_t_cs);
+            app().render(_t_cs2);
+        }
+    };
 }
 GGJ16_NAMESPACE_END
 
@@ -1472,7 +1579,7 @@ void fill_ps(ggj16::cplayer_state& ps)
     ps.emplace_atk_ritual<symbol_ritual>("Fireball",
         "Easy ritual.\nConnect the dots.\nLow HP damage.\nMinimal shield "
         "damage.",
-        ritual_type::complete, 4,
+        ritual_type::complete, 4, 15,
         [](symbol_ritual& sr)
         {
             sr.add_point({{-30.f * 2.8f, 60.f * 2.8f}, 10.f});
@@ -1483,6 +1590,8 @@ void fill_ps(ggj16::cplayer_state& ps)
         },
         [](battle_context_t& c)
         {
+            assets().psnd_one(assets().fireball);
+
             c.damage_enemy_by(20);
             c.damage_enemy_shield_by(5);
         });
@@ -1490,7 +1599,7 @@ void fill_ps(ggj16::cplayer_state& ps)
     ps.emplace_atk_ritual<aura_ritual>("Rend shield",
         "Medium ritual.\nPrevent dots from disappearing.\nMinimal HP "
         "damage.\nLarge shield damage.",
-        ritual_type::resist, 6,
+        ritual_type::resist, 6, 20,
         [](aura_ritual& sr)
         {
             sr.add_point({{-0.f, -45.f * 3.5f}, 20.f});
@@ -1499,6 +1608,7 @@ void fill_ps(ggj16::cplayer_state& ps)
         },
         [](battle_context_t& c)
         {
+            assets().psnd_one(assets().fireball);
             c.damage_enemy_by(5);
             c.damage_enemy_shield_by(25);
         });
@@ -1506,7 +1616,7 @@ void fill_ps(ggj16::cplayer_state& ps)
     ps.emplace_atk_ritual<symbol_ritual>("Obliterate",
         "Hard ritual.\nConnect the dots.\nMassive HP damage.\nLow shield "
         "damage.",
-        ritual_type::complete, 3,
+        ritual_type::complete, 3, 50,
         [](symbol_ritual& sr)
         {
             auto x(-1024 / 2.f);
@@ -1548,6 +1658,7 @@ void fill_ps(ggj16::cplayer_state& ps)
         },
         [](battle_context_t& c)
         {
+            assets().psnd_one(assets().obliterate);
             c.damage_enemy_shield_by(20);
             c.damage_enemy_by(60);
         });
@@ -1555,7 +1666,7 @@ void fill_ps(ggj16::cplayer_state& ps)
     ps.emplace_utl_ritual<drag_ritual>("Heal",
         "Easy ritual.\nCollect the dots.\nMedium HP heal.\nMinimal shield "
         "self-damage.",
-        ritual_type::complete, 5,
+        ritual_type::complete, 5, 30,
         [](drag_ritual& sr)
         {
             sr.add_target(
@@ -1578,7 +1689,7 @@ void fill_ps(ggj16::cplayer_state& ps)
     ps.emplace_utl_ritual<drag_ritual>("Repair shield",
         "Medium ritual.\nCollect the dots.\nMinimal HP self-damage.\nMedium "
         "shield restoration.",
-        ritual_type::complete, 6,
+        ritual_type::complete, 6, 40,
         [](drag_ritual& sr)
         {
             sr.add_target(
@@ -1600,7 +1711,7 @@ void fill_ps(ggj16::cplayer_state& ps)
 
 
     ps.emplace_mana_ritual<aura_ritual>("Restore mana",
-        "Medium ritual.\nRestores your mana.", ritual_type::resist, 6,
+        "Medium ritual.\nRestores your mana.", ritual_type::resist, 6, 0,
         [](aura_ritual& sr)
         {
             auto offset(30.f);
@@ -1615,10 +1726,48 @@ void fill_ps(ggj16::cplayer_state& ps)
         },
         [](battle_context_t& c)
         {
+            assets().psnd_one(assets().shield_up);
             c.restore_player_mana();
         });
 }
 
+auto first_ai()
+{
+    using namespace ggj16;
+
+    return [](battle_screen& bs, battle_context_t& bc)
+    {
+        auto& ps(bc.player().stats());
+        auto& es(bc.enemy().stats());
+
+        if(es.health() <= es.maxhealth() * 0.3)
+        {
+            bs.display_msg_box("The demon attempts to heal himself!");
+            bc.heal_enemy_by(12);
+            bc.damage_enemy_shield_by(3);
+        }
+        else if(es.shield() <= es.maxshield() * 0.3)
+        {
+            bs.display_msg_box("The demon attempts to restore his shield!");
+            bc.heal_enemy_shield_by(8);
+            bc.damage_enemy_by(5);
+        }
+        else if(ps.shield() >= ps.shield() * 0.7)
+        {
+            bs.display_msg_box("The demon performs\nan armor-piercing attack!");
+            bc.damage_player_shield_by(15);
+            bc.damage_player_by(5);
+        }
+        else
+        {
+            bs.display_msg_box("The demon pounces at the player.");
+            bc.damage_player_by(25);
+            bc.damage_player_shield_by(2);
+        }
+
+        bs.end_enemy_turn();
+    };
+}
 
 int main()
 {
@@ -1653,44 +1802,20 @@ int main()
     fill_ps(ps);
 
     cenemy_state es;
-    es._f_ai = [](battle_screen& bs, battle_context_t& bc)
-    {
-        auto& ps(bc.player().stats());
-        auto& es(bc.enemy().stats());
-
-        if(es.health() <= es.maxhealth() * 0.3)
-        {
-            bs.display_msg_box("The demon attempts to heal himself!");
-            bc.heal_enemy_by(12);
-            bc.damage_enemy_shield_by(3);
-        }
-        else if(es.shield() <= es.maxshield() * 0.3)
-        {
-            bs.display_msg_box("The demon attempts to restore his shield!");
-            bc.heal_enemy_shield_by(8);
-            bc.damage_enemy_by(5);
-        }
-        else if(ps.shield() >= ps.shield() * 0.7)
-        {
-            bs.display_msg_box("The demon performs an armor-piercing attack!");
-            bc.damage_player_shield_by(15);
-            bc.damage_player_by(5);
-        }
-        else
-        {
-            bs.display_msg_box("The demon pounces at the player.");
-            bc.damage_player_by(25);
-            bc.damage_player_shield_by(2);
-        }
-
-        bs.end_enemy_turn();
-    };
+    es._f_ai = first_ai();
 
     battle_t b{b0, b1};
     battle_context_t b_ctx{ps, es, b};
 
-    auto& test_battle(app.make_screen<battle_screen>(b_ctx));
-    app.push_screen(test_battle);
+    auto& s_title(app.make_screen<title_screen>());
+    auto& s_battle(app.make_screen<battle_screen>(b_ctx));
+
+    s_title.on_start = [&]
+    {
+        app.push_screen(s_battle);
+    };
+
+    app.push_screen(s_title);
 
     game.run();
     return 0;

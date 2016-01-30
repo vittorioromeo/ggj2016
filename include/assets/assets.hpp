@@ -30,19 +30,13 @@ GGJ16_NAMESPACE
             CACHE_ASSETS(ssvs::BitmapFont, "", fontObStroked, fontObBig)
 
             // Textures
-            /*
-    CACHE_ASSETS(sf::Texture, ".png", slotChoice, slotChoiceBlocked,
-        iconHPS, iconATK, iconDEF, drops, enemy, blocked, back, dropsModal,
-        advance, itemCard, eFire, eWater, eEarth, eLightning, eST, eWK, eTY,
-        equipCard, wpnMace, wpnSword, wpnSpear, armDrop, panelsmall,
-        panellog)
-                */
+            CACHE_ASSETS(sf::Texture, ".png", landscape)
+
 
             // Sounds
-            /*
-    CACHE_ASSETS(sf::SoundBuffer, ".ogg", lvl1, lvl2, lvl3, lvl4, menu,
-        powerup, drop, grab, equipArmor, equipWpn, lose)
-                */
+            CACHE_ASSETS(sf::SoundBuffer, ".ogg", click0, enemy_atk0,
+                enemy_atk1, msgbox, shield_up, fireball, obliterate, success,
+                failure)
 
             /*
     std::vector<sf::SoundBuffer *> swordSnds, maceSnds, spearSnds;
@@ -66,6 +60,22 @@ GGJ16_NAMESPACE
                 */
 
                 _sound_player.setVolume(100.f);
+            }
+
+            template <typename T>
+            inline void psnd(T&& s, ssvs::SoundPlayer::Mode mMode =
+                                        ssvs::SoundPlayer::Mode::Overlap,
+                float mPitch = 1.f)
+            {
+                _sound_player.play(*s, mMode, mPitch);
+            }
+
+            template <typename... Ts>
+            inline void psnd_one(Ts... xs)
+            {
+                std::vector<std::common_type_t<Ts...>> v{xs...};
+                ssvu::shuffle(v);
+                psnd(v[0]);
             }
         };
     }

@@ -2,10 +2,18 @@
     "textures":
     [
         "fontObStroked.png",
-        "fontObBig.png"
+        "fontObBig.png",
+        "landscape.png"
     ],
     "soundBuffers":
-    [   
+    [   "click0.ogg",
+"enemy_atk1.ogg",
+"msgbox.ogg",
+"shield_up.ogg",
+"enemy_atk0.ogg",
+"fireball.ogg",
+"obliterate.ogg",
+"success.ogg"
     ],
     "musics":
     [
