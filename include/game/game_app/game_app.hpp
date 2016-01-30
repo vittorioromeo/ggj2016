@@ -88,8 +88,8 @@ GGJ16_NAMESPACE
                         sf::RectangleShape block;
                         block.setPosition(vec2f(0, 0));
                         block.setSize(vec2f(320, 240));
-                        block.setFillColor(
-                            sf::Color{0, 0, 0, isc->opacity_block()});
+                        block.setFillColor(sf::Color{0, 0, 0,
+                            static_cast<sf::Uint8>(isc->opacity_block())});
 
                         to_draw.emplace_back([this, block, &rt]
                             {
@@ -136,6 +136,9 @@ GGJ16_NAMESPACE
 
     class game_app : public boilerplate::app
     {
+    public:
+        float _shake{0};
+
     private:
         using this_type = game_app;
 
@@ -143,14 +146,32 @@ GGJ16_NAMESPACE
 
         void init_loops()
         {
-            state().onUpdate += [this](ft dt)
+            auto orig_camera_pos = _camera.getCenter();
+            state().onUpdate += [this, orig_camera_pos](ft dt)
             {
                 _screen_manager.update(dt);
+
+                if(_shake > 0)
+                {
+                    _shake -= dt * 0.6f;
+                    _shake = std::abs(_shake);
+
+                    _camera.setCenter(
+                        orig_camera_pos +
+                        vec2f{ssvu::getRndR(-_shake, _shake + 0.1f),
+                            ssvu::getRndR(-_shake, _shake + 0.1f)});
+                }
+                else
+                {
+                    _camera.setCenter(orig_camera_pos);
+                }
             };
 
             state().onDraw += [this]
             {
+                _camera.apply();
                 _screen_manager.draw(window());
+                _camera.unapply();
             };
         }
 

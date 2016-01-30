@@ -137,7 +137,7 @@ GGJ16_NAMESPACE
             : _pos(pos), _bmc(bmc)
         {
             _tr.setAlign(ssvs::TextAlign::Left);
-            _tr.in(_bmc.label()).mk("");
+            _tr.eff<BTR::Tracking>(-3).in(_bmc.label()).mk("");
 
             vec2f shape_sz(130, 20);
             _shape.setSize(shape_sz);
@@ -164,7 +164,7 @@ GGJ16_NAMESPACE
                 bm._was_pressed = false;
             }
 
-            _tr.setPosition(_pos);
+            _tr.setPosition(_pos + vec2f(5.f, 5.f));
 
             _tr.update(dt);
         }

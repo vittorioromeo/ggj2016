@@ -22,9 +22,15 @@ GGJ16_NAMESPACE
     enum class ritual_minigame_state
     {
         in_progress,
-        timed_out,
+        failure,
         success,
         invalid
+    };
+
+    enum class ritual_type
+    {
+        resist,
+        complete
     };
 
     class battle_ritual_context;
@@ -38,11 +44,15 @@ GGJ16_NAMESPACE
             float _time_left;
 
         public:
+            ritual_type _type{ritual_type::resist};
+
             battle_ritual_context* _ctx;
             game_app& app() noexcept;
 
+            const auto& type() const noexcept { return _type; }
+
         protected:
-            void time_out() { _state = ritual_minigame_state::timed_out; }
+            void failure() { _state = ritual_minigame_state::failure; }
             void success() { _state = ritual_minigame_state::success; }
 
         public:
@@ -55,7 +65,14 @@ GGJ16_NAMESPACE
                 _time_left -= dt;
                 if(_time_left <= 0.f)
                 {
-                    time_out();
+                    if(_type == ritual_type::resist)
+                    {
+                        success();
+                    }
+                    else if(_type == ritual_type::complete)
+                    {
+                        failure();
+                    }
                 }
             }
 
@@ -79,6 +96,7 @@ GGJ16_NAMESPACE
         float _radius{6.f};
     };
 
+
     class symbol_ritual : public impl::ritual_minigame_base
     {
     private:
@@ -88,12 +106,31 @@ GGJ16_NAMESPACE
         vec2f _center{320 / 2.f, 240 / 2.f};
         std::vector<sf::CircleShape> _pshapes;
         std::vector<ssvs::BitmapText> _ptexts;
+        std::vector<int> _phits;
 
         auto is_shape_hovered(const sf::CircleShape& cs) noexcept
         {
             auto mp(app().window().getMousePosition());
             return ssvs::getDistEuclidean(mp, cs.getPosition()) <
                    cs.getRadius();
+        }
+
+        auto all_hit_before(int i)
+        {
+            for(int j = 0; j < i; ++j)
+            {
+                if(_phits[j] == 0) return false;
+            }
+            return true;
+        }
+
+        auto all_hit() const noexcept
+        {
+            for(const auto& h : _phits)
+            {
+                if(h == 0) return false;
+            }
+            return true;
         }
 
     public:
@@ -103,7 +140,7 @@ GGJ16_NAMESPACE
             _pshapes.emplace_back();
             auto& s(_pshapes.back());
             s.setFillColor(sfc::Red);
-            s.setOutlineThickness(1);
+            s.setOutlineThickness(2);
             s.setOutlineColor(sfc::Black);
             s.setRadius(sp._radius);
             ssvs::setOrigin(s, ssvs::getLocalCenter);
@@ -115,26 +152,39 @@ GGJ16_NAMESPACE
             t.setString(std::to_string(next_id++));
             ssvs::setOrigin(t, ssvs::getLocalCenter);
             t.setPosition(s.getPosition());
+
+            // Add hit
+            _phits.emplace_back(0);
         }
 
         void update(ft dt) override
         {
             base_type::update(dt);
 
-            for(auto& s : _pshapes)
+            if(all_hit())
             {
-                if(is_shape_hovered(s))
-                {
-                    s.setFillColor(sfc::Green);
-                }
-                else
-                {
-                    s.setFillColor(sfc::Red);
-                }
+                success();
+                return;
             }
 
-            for(auto& t : _ptexts)
+            for(sz_t i = 0; i < _pshapes.size(); ++i)
             {
+                auto& s(_pshapes[i]);
+                auto& t(_ptexts[i]);
+                auto& h(_phits[i]);
+
+                if(all_hit_before(i) && is_shape_hovered(s))
+                {
+                    h = 1;
+                }
+
+                if(h == 1)
+                {
+                    s.setFillColor(sfc::Green);
+                    t.setString("");
+                    ssvs::setOrigin(s, ssvs::getLocalCenter);
+                    s.setRadius(std::max(0.f, std::abs(s.getRadius() - (dt))));
+                }
             }
         }
         void draw() override
@@ -151,30 +201,239 @@ GGJ16_NAMESPACE
         }
     };
 
-    class example_ritual : public impl::ritual_minigame_base
+    class aura_ritual : public impl::ritual_minigame_base
     {
     private:
         using base_type = impl::ritual_minigame_base;
 
+        vec2f _center{320 / 2.f, 240 / 2.f};
+        std::vector<sf::CircleShape> _pshapes;
+
+        auto is_shape_hovered(const sf::CircleShape& cs) noexcept
+        {
+            auto mp(app().window().getMousePosition());
+            return ssvs::getDistEuclidean(mp, cs.getPosition()) <
+                   cs.getRadius();
+        }
+
+        auto any_dead() const noexcept
+        {
+            for(const auto& c : _pshapes)
+                if(c.getRadius() < 5.f) return true;
+
+            return false;
+        }
+
     public:
-        void update(ft dt) override { base_type::update(dt); }
-        void draw() override {}
+        void add_point(const symbol_point& sp)
+        {
+            // Add shape
+            _pshapes.emplace_back();
+            auto& s(_pshapes.back());
+            s.setFillColor(sfc::Red);
+            s.setOutlineThickness(1);
+            s.setOutlineColor(sfc::Black);
+            s.setRadius(sp._radius);
+            ssvs::setOrigin(s, ssvs::getLocalCenter);
+            s.setPosition(_center + sp._p);
+        }
+
+        void update(ft dt) override
+        {
+            base_type::update(dt);
+
+            if(any_dead())
+            {
+                failure();
+            }
+
+            for(sz_t i = 0; i < _pshapes.size(); ++i)
+            {
+                auto& s(_pshapes[i]);
+
+                ssvs::setOrigin(s, ssvs::getLocalCenter);
+
+
+                if(is_shape_hovered(s))
+                {
+                    s.setFillColor(sfc::Green);
+                    s.setRadius(
+                        std::min(35.f, std::abs(s.getRadius() + dt * 2.0f)));
+                }
+                else
+                {
+                    s.setFillColor(sfc::Red);
+                    s.setRadius(
+                        std::max(0.f, std::abs(s.getRadius() - (dt * 0.3f))));
+                }
+            }
+        }
+        void draw() override
+        {
+            for(auto& s : _pshapes)
+            {
+                app().render(s);
+            }
+        }
     };
+
+
+
+    class drag_ritual : public impl::ritual_minigame_base
+    {
+    private:
+        using base_type = impl::ritual_minigame_base;
+
+        vec2f _center{320 / 2.f, 240 / 2.f};
+
+        std::vector<sf::RectangleShape> _ptargets;
+        std::vector<int> _phits;
+        std::vector<sf::CircleShape> _pdraggables;
+        int _curr = -1;
+
+
+        auto is_shape_hovered(const sf::RectangleShape& cs) noexcept
+        {
+            auto mp(app().window().getMousePosition());
+
+            if(mp.x < ssvs::getGlobalLeft(cs)) return false;
+            if(mp.x > ssvs::getGlobalRight(cs)) return false;
+
+            if(mp.y < ssvs::getGlobalTop(cs)) return false;
+            if(mp.y > ssvs::getGlobalBottom(cs)) return false;
+
+            return true;
+        }
+
+        auto is_shape_hovered(const sf::CircleShape& cs) noexcept
+        {
+            auto mp(app().window().getMousePosition());
+            return ssvs::getDistEuclidean(mp, cs.getPosition()) <
+                   cs.getRadius();
+        }
+
+        auto is_in_target(
+            const sf::CircleShape& cs, const sf::RectangleShape rs)
+        {
+            return ssvs::getDistEuclidean(cs.getPosition(), rs.getPosition()) <
+                   20.f;
+        }
+
+        auto all_hit() const noexcept
+        {
+            for(const auto& x : _phits)
+                if(x == 0) return false;
+            return true;
+        }
+
+
+    public:
+        void add_target(vec2f p)
+        {
+            _ptargets.emplace_back();
+            auto& t(_ptargets.back());
+
+            t.setFillColor(sfc::Black);
+            t.setOutlineColor(sfc::White);
+            t.setOutlineThickness(4.f);
+            t.setSize(vec2f(26, 26));
+            ssvs::setOrigin(t, ssvs::getLocalCenter);
+            t.setPosition(p);
+        }
+
+        void add_draggable(vec2f p)
+        {
+            _pdraggables.emplace_back();
+            _phits.emplace_back(0);
+            auto& t(_pdraggables.back());
+
+            t.setFillColor(sfc::Red);
+            t.setOutlineColor(sfc::Black);
+            t.setOutlineThickness(2.f);
+            t.setRadius(10.f);
+            ssvs::setOrigin(t, ssvs::getLocalCenter);
+            t.setPosition(p);
+        }
+
+        void update(ft dt) override
+        {
+            base_type::update(dt);
+
+            if(all_hit())
+            {
+                success();
+            }
+
+            if(_curr != 1 && _phits[_curr] == 1)
+            {
+                _curr = -1;
+            }
+
+            for(int i = 0; i < (int)_pdraggables.size(); ++i)
+            {
+                auto& s(_pdraggables[i]);
+                ssvs::setOrigin(s, ssvs::getLocalCenter);
+
+                if(_phits[i] == 0 && is_shape_hovered(s) && _curr == -1)
+                {
+                    s.setFillColor(sfc::Green);
+                    _curr = i;
+                }
+
+                if(_curr == i && _phits[i] == 0)
+                {
+                    auto mp(app().window().getMousePosition());
+                    s.setPosition(mp);
+                }
+
+                for(auto& t : _ptargets)
+                {
+                    if(is_in_target(s, t))
+                    {
+                        s.setRadius(0.f);
+                        _phits[i] = 1;
+                    }
+                }
+            }
+
+            for(auto& t : _ptargets)
+            {
+                t.setRotation(t.getRotation() + dt * 0.5f);
+            }
+        }
+
+        void draw() override
+        {
+            for(auto& s : _ptargets)
+            {
+                app().render(s);
+            }
+
+            for(auto& s : _pdraggables)
+            {
+                app().render(s);
+            }
+        }
+    };
+
 
     class ritual_maker
     {
     private:
         std::string _label;
+        ritual_type _type;
         float _time;
         std::function<ritual_uptr()> _fn_make;
 
     public:
         template <typename TF>
-        ritual_maker(const std::string& label, float time, TF&& f)
-            : _label{label}, _time{time}, _fn_make(f)
+        ritual_maker(
+            const std::string& label, ritual_type type, float time, TF&& f)
+            : _label{label}, _type{type}, _time{time}, _fn_make(f)
         {
         }
 
+        const auto& type() const noexcept { return _type; }
         const auto& time() const noexcept { return _time; }
         const auto& label() const noexcept { return _label; }
 
@@ -191,11 +450,13 @@ GGJ16_NAMESPACE
         cplayer_state() { _rituals.reserve(6); }
 
         template <typename T, typename TF, typename... Ts>
-        void emplace_ritual(const std::string& label, float time, TF&& f_init)
+        void emplace_ritual(
+            const std::string& label, ritual_type rt, float time, TF&& f_init)
         {
-            _rituals.emplace_back(label, time, [f_init]
+            _rituals.emplace_back(label, rt, time, [f_init, rt]
                 {
                     auto uptr(std::make_unique<T>());
+                    uptr->_type = rt;
                     f_init(*uptr);
                     return uptr;
                 });
@@ -241,10 +502,10 @@ GGJ16_NAMESPACE
 
         battle_ritual_context(game_app& app) : _app(app) { init_text(); }
 
-        auto is_timed_out() const noexcept
+        auto is_failure() const noexcept
         {
             VRM_CORE_ASSERT(valid());
-            return _minigame->state() == ritual_minigame_state::timed_out;
+            return _minigame->state() == ritual_minigame_state::failure;
         }
 
         auto is_in_progress() const noexcept
@@ -305,9 +566,6 @@ GGJ16_NAMESPACE
             return _ctx->app();
         }
     }
-
-    class battle_screen;
-
 
     class battle_screen : public game_screen
     {
@@ -435,17 +693,6 @@ GGJ16_NAMESPACE
             _state = battle_screen_state::player_ritual;
             auto time_as_ft(ssvu::getSecondsToFT(rm.time()));
             _ritual_ctx.set_and_start_minigame(time_as_ft, rm.make());
-
-
-            // _current_ritual = x;
-
-            // show minigame
-            // execute minigame
-            // apply changes to battle
-
-            // auto& battle(_battle_context.battle());
-            // auto must_continue(check_battle_state());
-            // if(!must_continue) return;
         }
 
         void fill_ritual_menu()
@@ -454,11 +701,11 @@ GGJ16_NAMESPACE
             m.clear();
 
             auto& ps(_battle_context.player_state());
-            ps.for_rituals([this, &m](auto& r)
+            ps.for_rituals([this, &m](auto& rr)
                 {
-                    m.emplace_choice(r.label(), [this, &r](auto& bm)
+                    m.emplace_choice(rr.label(), [this, &rr](auto& bm)
                         {
-                            this->execute_ritual(r);
+                            this->execute_ritual(rr);
                             bm.pop_screen();
                         });
                 });
@@ -526,6 +773,13 @@ GGJ16_NAMESPACE
             update_menu(1.f);
         }
 
+        void ritual_failure()
+        {
+            app()._shake = 40;
+            add_scripted_text(1.2f, "Failure!");
+        }
+        void ritual_success() { add_scripted_text(1.2f, "Success!"); }
+
         void update_menu(ft dt) { _menu_gfx_state.update(app(), _menu, dt); }
         void draw_menu() { _menu_gfx_state.draw(app().window()); }
 
@@ -536,12 +790,15 @@ GGJ16_NAMESPACE
             if(_ritual_ctx.is_in_progress())
             {
             }
-            else if(_ritual_ctx.is_timed_out())
+            else if(_ritual_ctx.is_failure())
             {
+
+                ritual_failure();
                 start_enemy_turn();
             }
             else if(_ritual_ctx.is_success())
             {
+                ritual_success();
                 start_enemy_turn();
             }
         }
@@ -668,13 +925,36 @@ int main()
     battle_participant b1{cs1};
 
     cplayer_state ps;
-    ps.emplace_ritual<symbol_ritual>("Fireball", 4, [](symbol_ritual& sr)
+    ps.emplace_ritual<symbol_ritual>("Fireball", ritual_type::complete, 4,
+        [](symbol_ritual& sr)
         {
-            sr.add_point({{-20.f, 60.f}, 10.f});
+            sr.add_point({{-30.f, 60.f}, 10.f});
             sr.add_point({{0.f, -60.f}, 10.f});
-            sr.add_point({{20.f, 60.f}, 10.f});
-            sr.add_point({{-50.f, -20.f}, 10.f});
-            sr.add_point({{50.f, -20.f}, 10.f});
+            sr.add_point({{30.f, 60.f}, 10.f});
+            sr.add_point({{-50.f, -10.f}, 10.f});
+            sr.add_point({{50.f, -10.f}, 10.f});
+        });
+
+    ps.emplace_ritual<aura_ritual>("Rend armor", ritual_type::resist, 6,
+        [](aura_ritual& sr)
+        {
+            sr.add_point({{-0.f, -45.f}, 20.f});
+            sr.add_point({{-31.f, 31.f}, 20.f});
+            sr.add_point({{31.f, 31.f}, 20.f});
+        });
+
+    ps.emplace_ritual<drag_ritual>("Heal", ritual_type::complete, 5,
+        [](drag_ritual& sr)
+        {
+            sr.add_target({320.f / 2, 240.f / 2});
+
+            for(int i = 0; i < 6; ++i)
+            {
+                auto offset(20.f);
+                auto x(ssvu::getRndR(offset, 320 - offset));
+                auto y(ssvu::getRndR(offset, 240 - offset));
+                sr.add_draggable(vec2f{x, y});
+            }
         });
 
     battle_t b{b0, b1};
@@ -686,4 +966,3 @@ int main()
     game.run();
     return 0;
 }
-
