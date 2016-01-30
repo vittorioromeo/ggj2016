@@ -290,6 +290,16 @@ GGJ16_NAMESPACE
             enemy().stunned_for() = x;
             notify_stun(battle_event_type::enemy_stunned, x);
         }
+
+        void restore_player_mana()
+        {
+            player().stats().mana() = player().stats().maxmana();
+        }
+
+        void restore_enemy_mana()
+        {
+            enemy().stats().mana() = enemy().stats().maxmana();
+        }
     };
 }
 GGJ16_NAMESPACE_END

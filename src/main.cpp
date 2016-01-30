@@ -766,6 +766,7 @@ GGJ16_NAMESPACE
         stat_bar _health_b{sfc::Red};
         stat_bar _shield_b{sfc::Yellow};
         stat_bar _mana_b{sfc::Blue};
+        bool _mana_visibile{true};
 
         stats_gfx()
         {
@@ -779,7 +780,7 @@ GGJ16_NAMESPACE
             states.transform *= getTransform();
             target.draw(_health_b, states);
             target.draw(_shield_b, states);
-            target.draw(_mana_b, states);
+            if(_mana_visibile) target.draw(_mana_b, states);
         }
 
         void refresh(const character_stats& cs)
@@ -788,6 +789,8 @@ GGJ16_NAMESPACE
             _shield_b.refresh(cs.shield(), cs.maxshield());
             _mana_b.refresh(cs.mana(), cs.maxmana());
         }
+
+        void hide_mana() { _mana_visibile = false; }
     };
 
     class battle_screen : public game_screen
@@ -852,6 +855,7 @@ GGJ16_NAMESPACE
             _player_stats_gfx.setPosition(
                 vec2f{20.f, game_constants::height - h + 20.f});
             _enemy_stats_gfx.setPosition(vec2f{20.f, 20.f});
+            _enemy_stats_gfx.hide_mana();
         }
 
         void init_cs_text()
@@ -970,11 +974,12 @@ GGJ16_NAMESPACE
                     m.emplace_choice(rr.label(), rr.desc(),
                         [this, &pst, &rr](auto& bm)
                         {
-                            if(rr.req_mana() > pst.mana())
+                            if(rr.req_mana() <= pst.mana())
                             {
+                                pst.mana() -= rr.req_mana();
                                 this->execute_ritual(rr);
+                                bm.pop_screen();
                             }
-                            bm.pop_screen();
                         });
                 });
 
@@ -997,11 +1002,12 @@ GGJ16_NAMESPACE
                     m.emplace_choice(rr.label(), rr.desc(),
                         [this, &pst, &rr](auto& bm)
                         {
-                            if(rr.req_mana() > pst.mana())
+                            if(rr.req_mana() <= pst.mana())
                             {
+                                pst.mana() -= rr.req_mana();
                                 this->execute_ritual(rr);
+                                bm.pop_screen();
                             }
-                            bm.pop_screen();
                         });
                 });
 
@@ -1597,11 +1603,11 @@ void fill_ps(ggj16::cplayer_state& ps)
         "Medium ritual.\nRestores your mana.", ritual_type::resist, 6,
         [](aura_ritual& sr)
         {
-            auto offset(40.f);
-          //  vec2f center(
-         //       game_constants::width / 2.f, game_constants::height / 2.f);
+            auto offset(30.f);
+            //  vec2f center(
+            //       game_constants::width / 2.f, game_constants::height / 2.f);
 
-            for(int i = -4; i < 5; ++i)
+            for(int i = -3; i < 4; ++i)
             {
                 sr.add_point({vec2f{offset * i, offset * i}, 20.f});
             }
@@ -1609,7 +1615,7 @@ void fill_ps(ggj16::cplayer_state& ps)
         },
         [](battle_context_t& c)
         {
-            // TODO:
+            c.restore_player_mana();
         });
 }
 
@@ -1629,6 +1635,8 @@ int main()
     cs0.power() = 10;
     cs0.maxhealth() = 100;
     cs0.maxshield() = 40;
+    cs0.mana() = 100;
+    cs0.maxmana() = 100;
     battle_participant b0{cs0};
 
     character_stats cs1;
@@ -1637,6 +1645,8 @@ int main()
     cs1.power() = 10;
     cs1.maxhealth() = 100;
     cs1.maxshield() = 40;
+    cs1.mana() = 100;
+    cs1.maxmana() = 100;
     battle_participant b1{cs1};
 
     cplayer_state ps;

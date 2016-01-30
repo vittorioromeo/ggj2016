@@ -171,7 +171,7 @@ GGJ16_NAMESPACE
             {
                 _screen_manager.update(dt);
 
-                if(_shake > 0)
+                if(_shake > 1.f)
                 {
                     _shake -= dt * 0.6f;
                     _shake = std::abs(_shake);
