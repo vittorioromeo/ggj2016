@@ -263,13 +263,13 @@ GGJ16_NAMESPACE
                 {
                     s.setFillColor(sfc::Green);
                     s.setRadius(
-                        std::min(98.f, std::abs(s.getRadius() + dt * 2.8f)));
+                        std::min(75.f, std::abs(s.getRadius() + dt * 2.78f)));
                 }
                 else
                 {
                     s.setFillColor(sfc::Red);
                     s.setRadius(
-                        std::max(0.f, std::abs(s.getRadius() - (dt * 0.72f))));
+                        std::max(0.f, std::abs(s.getRadius() - (dt * 0.74f))));
                 }
             }
         }
@@ -1361,6 +1361,7 @@ void fill_ps(ggj16::cplayer_state& ps)
         [](battle_context_t& c)
         {
             c.damage_enemy_by(20);
+            c.damage_enemy_shield_by(5);
         });
 
     ps.emplace_atk_ritual<aura_ritual>("Rend shield", ritual_type::resist, 6,
@@ -1418,7 +1419,7 @@ void fill_ps(ggj16::cplayer_state& ps)
         },
         [](battle_context_t& c)
         {
-            c.damage_enemy_shield_by(10);
+            c.damage_enemy_shield_by(20);
             c.damage_enemy_by(60);
         });
 
@@ -1438,8 +1439,8 @@ void fill_ps(ggj16::cplayer_state& ps)
         },
         [](battle_context_t& c)
         {
-            c.damage_player_shield_by(15);
-            c.heal_player_by(75);
+            c.damage_player_shield_by(10);
+            c.heal_player_by(45);
         });
 
     ps.emplace_utl_ritual<drag_ritual>("Repair shield", ritual_type::complete,
@@ -1460,7 +1461,7 @@ void fill_ps(ggj16::cplayer_state& ps)
         [](battle_context_t& c)
         {
             c.damage_player_by(5);
-            c.heal_player_shield_by(45);
+            c.heal_player_shield_by(25);
         });
 }
 
@@ -1496,8 +1497,8 @@ int main()
     cenemy_state es;
     es._f_ai = [](battle_screen& bs, battle_context_t& bc)
     {
-        bs.display_msg_box("Test");
-        bc.damage_player_by(10);
+        bs.display_msg_box("The demon pounces at the player.");
+        bc.damage_player_by(25);
         bs.end_enemy_turn();
     };
 

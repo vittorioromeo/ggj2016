@@ -201,21 +201,33 @@ GGJ16_NAMESPACE
         auto& enemy() noexcept { return battle().enemy(); }
         const auto& enemy() const noexcept { return battle().enemy(); }
 
+        template <typename T>
+        auto damage_calc(T& stats, stat_value x)
+        {
+            auto& h(stats.health());
+            auto& s(stats.shield());
+            auto& ms(stats.maxshield());
+
+            auto sratio(s / ms);
+            auto blocked_dmg(x * (sratio * 0.9f));
+            auto dmg(x - blocked_dmg);
+
+
+            h -= dmg;
+            ssvu::clampMin(h, 0);
+
+            return dmg;
+        }
+
         void damage_player_by(stat_value x)
         {
-            auto& s(player().stats().health());
-            s -= x;
-            ssvu::clampMin(s, 0);
-
+            x = damage_calc(player().stats(), x);
             notify_damage(battle_event_type::player_damaged, x);
         }
 
         void damage_enemy_by(stat_value x)
         {
-            auto& s(enemy().stats().health());
-            s -= x;
-            ssvu::clampMin(s, 0);
-
+            x = damage_calc(enemy().stats(), x);
             notify_damage(battle_event_type::enemy_damaged, x);
         }
 

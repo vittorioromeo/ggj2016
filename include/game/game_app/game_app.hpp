@@ -184,6 +184,7 @@ GGJ16_NAMESPACE
                 else
                 {
                     _camera.setCenter(orig_camera_pos);
+                    _shake = 0;
                 }
             };
 
