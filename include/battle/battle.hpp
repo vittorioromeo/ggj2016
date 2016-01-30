@@ -12,16 +12,7 @@
 
 GGJ16_NAMESPACE
 {
-
-
-    class cplayer_state
-    {
-    private:
-        // vector of available items
-        // vector of available rituals
-
-    public:
-    };
+    class cplayer_state;
 
     class battle_t
     {

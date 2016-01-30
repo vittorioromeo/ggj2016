@@ -65,6 +65,8 @@ GGJ16_NAMESPACE
         };
     }
 
+    using ritual_uptr = std::unique_ptr<impl::ritual_minigame_base>;
+
     class example_ritual : public impl::ritual_minigame_base
     {
     private:
@@ -74,6 +76,52 @@ GGJ16_NAMESPACE
         void update(ft dt) override { base_type::update(dt); }
         void draw() override {}
     };
+
+    class ritual_maker
+    {
+    private:
+        std::string _label;
+        float _time;
+        std::function<ritual_uptr()> _fn_make;
+
+    public:
+        template <typename TF>
+        ritual_maker(const std::string& label, float time, TF&& f)
+            : _label{label}, _time{time}, _fn_make(f)
+        {
+        }
+
+        const auto& time() const noexcept { return _time; }
+        const auto& label() const noexcept { return _label; }
+
+        auto make() { return _fn_make(); }
+    };
+
+    class cplayer_state
+    {
+    private:
+        std::vector<ritual_maker> _rituals;
+        // vector of available items
+
+    public:
+        cplayer_state() { _rituals.reserve(6); }
+
+        template <typename T, typename... Ts>
+        void emplace_ritual(const std::string& label, float time)
+        {
+            _rituals.emplace_back(label, time, []
+                {
+                    return std::make_unique<T>();
+                });
+        }
+
+        template <typename TF>
+        void for_rituals(TF&& f)
+        {
+            for(auto& r : _rituals) f(r);
+        }
+    };
+
 
     class battle_ritual_context
     {
@@ -123,11 +171,18 @@ GGJ16_NAMESPACE
             return _minigame->state() == ritual_minigame_state::success;
         }
 
-        template <typename T, typename... Ts>
-        void start_new_minigame(float time_left, Ts&&... xs)
+        /* template <typename T, typename... Ts>
+         void start_new_minigame(float time_left, Ts&&... xs)
+         {
+             _minigame = std::make_unique<T>(FWD(xs)...);
+             _minigame->start_minigame(time_left);
+         }*/
+
+        template <typename T>
+        void set_and_start_minigame(float time_as_ft, T&& x)
         {
-            _minigame = std::make_unique<T>(FWD(xs)...);
-            _minigame->start_minigame(time_left);
+            _minigame = std::move(x);
+            _minigame->start_minigame(time_as_ft);
         }
 
         void update(ft dt)
@@ -247,8 +302,6 @@ GGJ16_NAMESPACE
                 });
         }
 
-        auto is_executing_ritual() { return false; }
-
         void game_over() {}
         void success() {}
 
@@ -277,13 +330,14 @@ GGJ16_NAMESPACE
             _state = battle_screen_state::enemy_turn;
         }
 
-        void execute_ritual()
+        void execute_ritual(ritual_maker rm)
         {
-            add_scripted_text(1.7f, "Ritual!");
+            add_scripted_text(1.7f, rm.label());
 
             _state = battle_screen_state::player_ritual;
-            _ritual_ctx.template start_new_minigame<example_ritual>(
-                ssvu::getSecondsToFT(5));
+            auto time_as_ft(ssvu::getSecondsToFT(rm.time()));
+            _ritual_ctx.set_and_start_minigame(time_as_ft, rm.make());
+
 
             // _current_ritual = x;
 
@@ -301,21 +355,16 @@ GGJ16_NAMESPACE
             auto& m(*_m_ritual);
             m.clear();
 
-            m.emplace_choice("Ritual 0", [this](auto& bm)
+            auto& ps(_battle_context.player_state());
+            ps.for_rituals([this, &m](auto& r)
                 {
-                    this->execute_ritual();
-                    bm.pop_screen();
+                    m.emplace_choice(r.label(), [this, &r](auto& bm)
+                        {
+                            this->execute_ritual(r);
+                            bm.pop_screen();
+                        });
                 });
-            m.emplace_choice("Ritual 1", [this](auto& bm)
-                {
-                    this->execute_ritual();
-                    bm.pop_screen();
-                });
-            m.emplace_choice("Ritual 2", [this](auto& bm)
-                {
-                    this->execute_ritual();
-                    bm.pop_screen();
-                });
+
             m.emplace_choice("Go back", [](auto& bm)
                 {
                     bm.pop_screen();
@@ -521,6 +570,8 @@ int main()
     battle_participant b1{cs1};
 
     cplayer_state ps;
+    ps.emplace_ritual<example_ritual>("Fireball", 4);
+
     battle_t b{b0, b1};
     battle_context_t b_ctx{ps, b};
 
