@@ -237,7 +237,7 @@ GGJ16_NAMESPACE
             s.setFillColor(sfc::Red);
             s.setOutlineThickness(3);
             s.setOutlineColor(sfc::Black);
-            s.setRadius(sp._radius * 2.8f);
+            s.setRadius(sp._radius * 3.1f);
             ssvs::setOrigin(s, ssvs::getLocalCenter);
             s.setPosition(_center + sp._p);
         }
@@ -262,13 +262,13 @@ GGJ16_NAMESPACE
                 {
                     s.setFillColor(sfc::Green);
                     s.setRadius(
-                        std::min(120.f, std::abs(s.getRadius() + dt * 2.8f)));
+                        std::min(98.f, std::abs(s.getRadius() + dt * 2.8f)));
                 }
                 else
                 {
                     s.setFillColor(sfc::Red);
                     s.setRadius(
-                        std::max(0.f, std::abs(s.getRadius() - (dt * 0.6f))));
+                        std::max(0.f, std::abs(s.getRadius() - (dt * 0.72f))));
                 }
             }
         }
