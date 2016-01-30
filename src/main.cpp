@@ -16,7 +16,8 @@ GGJ16_NAMESPACE
     {
         player_menu,
         player_ritual,
-        enemy_turn
+        enemy_turn,
+        before_enemy_turn
     };
 
     enum class ritual_minigame_state
@@ -258,7 +259,7 @@ GGJ16_NAMESPACE
                 {
                     s.setFillColor(sfc::Green);
                     s.setRadius(
-                        std::min(35.f, std::abs(s.getRadius() + dt * 2.0f)));
+                        std::min(35.f, std::abs(s.getRadius() + dt * 1.8f)));
                 }
                 else
                 {
@@ -422,8 +423,7 @@ GGJ16_NAMESPACE
 
     class battle_participant;
 
-    using ritual_effect_fn = std::function<void(
-        cplayer_state&, battle_participant&, battle_participant&)>;
+    using ritual_effect_fn = std::function<void(battle_context_t&)>;
 
     class ritual_maker
     {
@@ -761,8 +761,7 @@ GGJ16_NAMESPACE
 
         void start_enemy_turn()
         {
-            add_scripted_text(1.7f, "Enemy turn!");
-            _state = battle_screen_state::enemy_turn;
+            _state = battle_screen_state::before_enemy_turn;
         }
 
         void execute_ritual(ritual_maker rm)
@@ -876,15 +875,13 @@ GGJ16_NAMESPACE
         void ritual_failure()
         {
             app()._shake = 40;
-            add_scripted_text(1.2f, "Failure!");
+            add_scripted_text(1.1f, "Failure!");
         }
         void ritual_success()
         {
-            add_scripted_text(1.2f, "Success!");
+            add_scripted_text(1.1f, "Success!");
 
-            auto& b(_battle_context.battle());
-            _success_effect(
-                _battle_context.player_state(), b.player(), b.enemy());
+            _success_effect(_battle_context);
         }
 
         void update_menu(ft dt) { _menu_gfx_state.update(app(), _menu, dt); }
@@ -933,9 +930,159 @@ GGJ16_NAMESPACE
             curr._f_draw();
         }
 
+        auto m_player_name() const { return std::string{"The player "}; }
+        auto m_enemy_name() const { return std::string{"The enemy "}; }
+
+        auto m_health(stat_value x) const
+        {
+            return std::string{" "} + std::to_string((int)x) +
+                   std::string{" health points"};
+        }
+
+        auto m_shield(stat_value x) const
+        {
+            return std::string{" "} + std::to_string((int)x) +
+                   std::string{" shield points"};
+        }
+
+    private:
+        std::vector<std::string> _next_notifications;
+
+    public:
+        void append_turn_notification(const std::string& s)
+        {
+            _next_notifications.emplace_back(s + ".");
+        }
+
+        void event_listener(battle_event be)
+        {
+            auto apnd_dmg = [this](auto&& name_fn, auto&& my_be)
+            {
+                append_turn_notification(
+                    name_fn() + "was damaged for\n" +
+                    m_health((int)(my_be.e_damage()._amount)));
+            };
+
+            auto apnd_sdmg = [this](auto&& name_fn, auto&& my_be)
+            {
+                append_turn_notification(
+                    name_fn() + "shield was damaged for\n" +
+                    m_shield((int)(my_be.e_damage()._amount)));
+            };
+
+            auto apnd_hl = [this](auto&& name_fn, auto&& my_be)
+            {
+                append_turn_notification(
+                    name_fn() + "was healed for\n" +
+                    m_health((int)(my_be.e_heal()._amount)));
+            };
+
+            auto apnd_shl = [this](auto&& name_fn, auto&& my_be)
+            {
+                append_turn_notification(
+                    name_fn() + "shield was restored for\n" +
+                    m_shield((int)(my_be.e_heal()._amount)));
+            };
+
+            auto apnd_stn = [this](auto&& name_fn, auto&& my_be)
+            {
+                append_turn_notification(
+                    name_fn() + "was stunned for for\n" +
+                    m_shield((int)(my_be.e_stun()._turns)) + " turns");
+            };
+
+            switch(be.type())
+            {
+                case battle_event_type::enemy_damaged:
+                    apnd_dmg(
+                        [this]
+                        {
+                            return m_enemy_name();
+                        },
+                        be);
+                    break;
+
+                case battle_event_type::player_damaged:
+                    apnd_dmg(
+                        [this]
+                        {
+                            return m_player_name();
+                        },
+                        be);
+                    break;
+
+                case battle_event_type::enemy_shield_damaged:
+                    apnd_sdmg(
+                        [this]
+                        {
+                            return m_enemy_name();
+                        },
+                        be);
+                    break;
+
+                case battle_event_type::player_shield_damaged:
+                    apnd_sdmg(
+                        [this]
+                        {
+                            return m_player_name();
+                        },
+                        be);
+                    break;
+
+                case battle_event_type::enemy_healed:
+                    apnd_hl(
+                        [this]
+                        {
+                            return m_enemy_name();
+                        },
+                        be);
+                    break;
+
+                case battle_event_type::player_healed:
+                    apnd_hl(
+                        [this]
+                        {
+                            return m_player_name();
+                        },
+                        be);
+                    break;
+
+                case battle_event_type::enemy_shield_healed:
+                    apnd_shl(
+                        [this]
+                        {
+                            return m_enemy_name();
+                        },
+                        be);
+                    break;
+
+                case battle_event_type::player_shield_healed:
+                    apnd_shl(
+                        [this]
+                        {
+                            return m_player_name();
+                        },
+                        be);
+                    break;
+
+                case battle_event_type::enemy_stunned:
+                    apnd_stn(
+                        [this]
+                        {
+                            return m_enemy_name();
+                        },
+                        be);
+                    break;
+            }
+        }
+
         void init_battle()
         {
             auto& battle(_battle_context.battle());
+            _battle_context.on_event += [this](auto e)
+            {
+                event_listener(e);
+            };
 
             // Assume player starts
             if(battle.is_player_turn())
@@ -968,6 +1115,15 @@ GGJ16_NAMESPACE
                 return;
             }
 
+            if(!_next_notifications.empty())
+            {
+                std::string acc;
+                for(const auto& nn : _next_notifications) acc += nn + "\n";
+                display_msg_box(acc);
+
+                _next_notifications.clear();
+            }
+
             if(_state == battle_screen_state::player_menu)
             {
                 update_menu(dt);
@@ -979,6 +1135,11 @@ GGJ16_NAMESPACE
             else if(_state == battle_screen_state::enemy_turn)
             {
                 update_enemy(dt);
+            }
+            else if(_state == battle_screen_state::before_enemy_turn)
+            {
+                add_scripted_text(1.7f, "Enemy turn!");
+                _state = battle_screen_state::enemy_turn;
             }
         }
 
@@ -1041,8 +1202,9 @@ int main()
             sr.add_point({{-50.f, -10.f}, 10.f});
             sr.add_point({{50.f, -10.f}, 10.f});
         },
-        [](cplayer_state&, battle_participant&, battle_participant&)
+        [](battle_context_t& c)
         {
+            c.damage_enemy_by(50);
         });
 
     ps.emplace_ritual<aura_ritual>("Rend armor", ritual_type::resist, 6,
@@ -1052,8 +1214,10 @@ int main()
             sr.add_point({{-31.f, 31.f}, 20.f});
             sr.add_point({{31.f, 31.f}, 20.f});
         },
-        [](cplayer_state&, battle_participant&, battle_participant&)
+        [](battle_context_t& c)
         {
+            c.damage_enemy_by(5);
+            c.damage_enemy_shield_by(25);
         });
 
     ps.emplace_ritual<drag_ritual>("Heal", ritual_type::complete, 5,
@@ -1069,8 +1233,10 @@ int main()
                 sr.add_draggable(vec2f{x, y});
             }
         },
-        [](cplayer_state&, battle_participant&, battle_participant&)
+        [](battle_context_t& c)
         {
+            c.damage_player_shield_by(15);
+            c.heal_player_by(75);
         });
 
     battle_t b{b0, b1};

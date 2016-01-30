@@ -87,13 +87,96 @@ GGJ16_NAMESPACE
         }
     };
 
+    enum class battle_event_type
+    {
+        player_damaged,
+        enemy_damaged,
+        player_healed,
+        enemy_healed,
+        player_shield_damaged,
+        player_shield_healed,
+        enemy_shield_damaged,
+        enemy_shield_healed,
+        enemy_stunned
+    };
+
+    namespace impl
+    {
+        struct b_damage_event
+        {
+            stat_value _amount;
+        };
+
+        struct b_heal_event
+        {
+            stat_value _amount;
+        };
+
+        struct b_stun_event
+        {
+            int _turns;
+        };
+    }
+
+#define MAKE_ACCESSORS(name, to_ret)         \
+    auto& name() noexcept { return to_ret; } \
+    const auto& name() const noexcept { return to_ret; }
+
+    class battle_event
+    {
+    private:
+        battle_event_type _et;
+
+        union
+        {
+            impl::b_damage_event _e_damage;
+            impl::b_heal_event _e_heal;
+            impl::b_stun_event _e_stun;
+        } _u;
+
+    public:
+        battle_event(battle_event_type et) : _et(et) {}
+
+        MAKE_ACCESSORS(e_damage, _u._e_damage)
+        MAKE_ACCESSORS(e_heal, _u._e_heal)
+        MAKE_ACCESSORS(e_stun, _u._e_stun)
+
+        const auto& type() const noexcept { return _et; }
+    };
+
+#undef MAKE_ACCESSORS
+
     class battle_context_t
     {
     private:
         cplayer_state& _player_state;
         battle_t _battle;
 
+        void notify_damage(battle_event_type et, stat_value x)
+        {
+            battle_event e{et};
+            e.e_damage()._amount = x;
+            on_event(e);
+        }
+
+        void notify_heal(battle_event_type et, stat_value x)
+        {
+            battle_event e{et};
+            e.e_heal()._amount = x;
+            on_event(e);
+        }
+
+        void notify_stun(battle_event_type et, int x)
+        {
+            battle_event e{et};
+            e.e_stun()._turns = x;
+            on_event(e);
+        }
+
+
     public:
+        ssvu::Delegate<void(battle_event)> on_event;
+
         battle_context_t(cplayer_state& player_state, const battle_t& battle)
             : _player_state{player_state}, _battle{battle}
         {
@@ -104,6 +187,78 @@ GGJ16_NAMESPACE
 
         auto& battle() noexcept { return _battle; }
         const auto& battle() const noexcept { return _battle; }
+
+        auto& player() noexcept { return battle().player(); }
+        const auto& player() const noexcept { return battle().player(); }
+
+        auto& enemy() noexcept { return battle().enemy(); }
+        const auto& enemy() const noexcept { return battle().enemy(); }
+
+        void damage_player_by(stat_value x)
+        {
+            auto& s(player().stats().health());
+            s -= x;
+            ssvu::clampMin(s, 0);
+
+            notify_damage(battle_event_type::player_damaged, x);
+        }
+
+        void damage_enemy_by(stat_value x)
+        {
+            auto& s(enemy().stats().health());
+            s -= x;
+            ssvu::clampMin(s, 0);
+
+            notify_damage(battle_event_type::enemy_damaged, x);
+        }
+
+        void heal_player_by(stat_value x)
+        {
+            player().stats().health() += x;
+            notify_heal(battle_event_type::player_healed, x);
+        }
+
+        void heal_enemy_by(stat_value x)
+        {
+            enemy().stats().health() += x;
+            notify_heal(battle_event_type::enemy_healed, x);
+        }
+
+        void damage_player_shield_by(stat_value x)
+        {
+            auto& s(player().stats().shield());
+            s -= x;
+            ssvu::clampMin(s, 0);
+
+            notify_damage(battle_event_type::player_shield_damaged, x);
+        }
+
+        void damage_enemy_shield_by(stat_value x)
+        {
+            auto& s(enemy().stats().shield());
+            s -= x;
+            ssvu::clampMin(s, 0);
+
+            notify_damage(battle_event_type::enemy_shield_damaged, x);
+        }
+
+        void heal_player_shield_by(stat_value x)
+        {
+            player().stats().shield() += x;
+            notify_heal(battle_event_type::player_shield_healed, x);
+        }
+
+        void heal_enemy_shield_by(stat_value x)
+        {
+            enemy().stats().shield() += x;
+            notify_heal(battle_event_type::enemy_shield_healed, x);
+        }
+
+        void stun_enemy_for(int x)
+        {
+            enemy().stunned_for() = x;
+            notify_stun(battle_event_type::enemy_stunned, x);
+        }
     };
 }
 GGJ16_NAMESPACE_END

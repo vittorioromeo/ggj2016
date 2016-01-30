@@ -16,13 +16,16 @@ GGJ16_NAMESPACE
     private:
         character_stats _stats;
         int _priority{0};
-        int _turns_to_skip{0};
+        int _stunned_for{0};
 
     public:
         battle_participant(const character_stats& stats) : _stats{stats} {}
 
         auto& stats() noexcept { return _stats; }
         const auto& stats() const noexcept { return _stats; }
+
+        auto& stunned_for() noexcept { return _stunned_for; }
+        const auto& stunned_for() const noexcept { return _stunned_for; }
     };
 
     /// @brief What happens to a battle participant after the execution of a
