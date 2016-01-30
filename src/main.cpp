@@ -18,7 +18,9 @@ GGJ16_NAMESPACE
         player_ritual,
         enemy_turn,
         before_enemy_turn,
-        before_player_turn
+        before_player_turn,
+        to_next_ctx,
+        to_game_over
     };
 
     enum class ritual_minigame_state
@@ -481,8 +483,10 @@ GGJ16_NAMESPACE
 
     struct cenemy_state
     {
-        sf::Texture* _enemy_texture{assets().landscape};
+        sf::Texture* _enemy_texture;
         std::function<void(battle_screen&, battle_context_t&)> _f_ai;
+
+        cenemy_state(sf::Texture* t) : _enemy_texture(t) {}
     };
 
     class cplayer_state
@@ -840,7 +844,12 @@ GGJ16_NAMESPACE
         battle_menu_screen* _m_ritual_atk;
         battle_menu_screen* _m_ritual_utl;
 
-        battle_context_t _battle_context;
+
+        std::vector<battle_context_t*> _ctxs;
+        sz_t _ctx_idx{0};
+
+        auto& curr_bctx() { return *(_ctxs[_ctx_idx]); }
+
         battle_screen_state _state{battle_screen_state::player_menu};
 
         battle_ritual_context _ritual_ctx;
@@ -879,7 +888,7 @@ GGJ16_NAMESPACE
             _enemy_stats_gfx.setPosition(vec2f{20.f, 20.f});
             _enemy_stats_gfx.hide_mana();
 
-            _enemy.setTexture(*_battle_context.enemy_state()._enemy_texture);
+            _enemy.setTexture(*curr_bctx().enemy_state()._enemy_texture);
             _enemy.setScale(vec2f(0.4f, 0.4f));
             ssvs::setOrigin(_enemy, ssvs::getLocalCenter);
             _esprite_pos = vec2f(game_constants::width / 2.f,
@@ -954,27 +963,8 @@ GGJ16_NAMESPACE
                 });
         }
 
-        void game_over() {}
-        void success() {}
-
-        auto check_battle_state()
-        {
-            auto& battle(_battle_context.battle());
-
-            if(battle.player_dead())
-            {
-                game_over();
-                return false;
-            }
-
-            if(battle.enemy_dead())
-            {
-                success();
-                return false;
-            }
-
-            return true;
-        }
+        void game_over() { _state = battle_screen_state::to_game_over; }
+        void success() { _state = battle_screen_state::to_next_ctx; }
 
         void start_enemy_turn()
         {
@@ -1002,8 +992,8 @@ GGJ16_NAMESPACE
             auto& m(*_m_ritual_atk);
             m.clear();
 
-            auto& ps(_battle_context.player_state());
-            auto& pst(_battle_context.player().stats());
+            auto& ps(curr_bctx().player_state());
+            auto& pst(curr_bctx().player().stats());
 
             ps.for_atk_rituals([this, &pst, &m](auto& rr)
                 {
@@ -1034,8 +1024,8 @@ GGJ16_NAMESPACE
             auto& m(*_m_ritual_utl);
             m.clear();
 
-            auto& ps(_battle_context.player_state());
-            auto& pst(_battle_context.player().stats());
+            auto& ps(curr_bctx().player_state());
+            auto& pst(curr_bctx().player().stats());
 
             ps.for_utl_rituals([this, &pst, &m](auto& rr)
                 {
@@ -1089,7 +1079,7 @@ GGJ16_NAMESPACE
                 });
             m.emplace_choice("Inspect enemy", "", [this](auto&)
                 {
-                    const auto& es(_battle_context.enemy().stats());
+                    const auto& es(this->curr_bctx().enemy().stats());
 
                     std::ostringstream oss;
                     oss << "Inspecting enemy...\n\n";
@@ -1102,7 +1092,7 @@ GGJ16_NAMESPACE
                     this->display_msg_box(oss.str());
                 });
 
-            auto& ps(_battle_context.player_state());
+            auto& ps(curr_bctx().player_state());
             ps.for_mana_rituals([this, &m](auto& rr)
                 {
                     m.emplace_choice(rr.label(), rr.desc(), [this, &rr](auto&)
@@ -1132,22 +1122,22 @@ GGJ16_NAMESPACE
         void ritual_failure()
         {
             app()._shake = 40;
-            assets().psnd_one(assets().failure);
             add_scripted_text(1.1f, "Failure!");
+            assets().psnd_one(assets().failure);
         }
         void ritual_success()
         {
             assets().psnd_one(assets().success);
             add_scripted_text(1.1f, "Success!");
 
-            _success_effect(_battle_context);
+            _success_effect(curr_bctx());
         }
 
 
         void update_stat_bars()
         {
-            _player_stats_gfx.refresh(_battle_context.player().stats());
-            _enemy_stats_gfx.refresh(_battle_context.enemy().stats());
+            _player_stats_gfx.refresh(curr_bctx().player().stats());
+            _enemy_stats_gfx.refresh(curr_bctx().enemy().stats());
         }
 
 
@@ -1277,7 +1267,7 @@ GGJ16_NAMESPACE
                             return m_enemy_name();
                         },
                         be);
-                    _enemy_shake = be.e_damage()._amount * 5;
+                    _enemy_shake = be.e_damage()._amount * 3;
                     break;
 
                 case battle_event_type::player_damaged:
@@ -1298,7 +1288,7 @@ GGJ16_NAMESPACE
                         },
                         be);
 
-                    _enemy_shake = be.e_damage()._amount * 3;
+                    _enemy_shake = be.e_damage()._amount * 2;
                     break;
 
                 case battle_event_type::player_shield_damaged:
@@ -1369,8 +1359,8 @@ GGJ16_NAMESPACE
 
         void init_battle()
         {
-            auto& battle(_battle_context.battle());
-            _battle_context.on_event += [this](auto e)
+            auto& battle(curr_bctx().battle());
+            curr_bctx().on_event += [this](auto e)
             {
                 this->event_listener(e);
             };
@@ -1386,10 +1376,10 @@ GGJ16_NAMESPACE
         }
 
     public:
-        battle_screen(game_app& app, battle_context_t& battle_context) noexcept
-            : base_type(app),
-              _battle_context{battle_context},
-              _ritual_ctx{app}
+        battle_screen(game_app& app,
+            std::vector<battle_context_t*> ctxs) noexcept : base_type(app),
+                                                            _ctxs(ctxs),
+                                                            _ritual_ctx{app}
         {
             init_menu_bg();
             init_cs_text();
@@ -1410,10 +1400,13 @@ GGJ16_NAMESPACE
                 vec2f offset(
                     ssvu::getRndR(-s, s + 0.1f), ssvu::getRndR(-s, s + 0.1f));
                 _enemy.setPosition(_esprite_pos + offset);
+
+                return;
             }
             else
             {
                 _enemy_shake = 0;
+                _enemy.setPosition(_esprite_pos);
             }
 
             if(!_scripted_events.empty())
@@ -1442,12 +1435,12 @@ GGJ16_NAMESPACE
             else if(_state == battle_screen_state::enemy_turn)
             {
                 // update_enemy(dt);
-                _battle_context.enemy_state()._f_ai(*this, _battle_context);
+                curr_bctx().enemy_state()._f_ai(*this, curr_bctx());
             }
             else if(_state == battle_screen_state::before_enemy_turn)
             {
                 // TODO: check for enemy death here
-                if(_battle_context.enemy().stats().health() <= 0)
+                if(curr_bctx().enemy().stats().health() <= 0)
                 {
                     success();
                 }
@@ -1459,8 +1452,8 @@ GGJ16_NAMESPACE
             }
             else if(_state == battle_screen_state::before_player_turn)
             {
-                // TODO: check for player death here
-                if(_battle_context.player().stats().health() <= 0)
+
+                if(curr_bctx().player().stats().health() <= 0)
                 {
                     game_over();
                 }
@@ -1469,6 +1462,24 @@ GGJ16_NAMESPACE
                     add_scripted_text(1.7f, "Player turn!");
                     _state = battle_screen_state::player_menu;
                 }
+            }
+            else if(_state == battle_screen_state::to_next_ctx)
+            {
+                ++_ctx_idx;
+                if(_ctx_idx < 4)
+                {
+                    display_msg_box("The next demon approaches...");
+                    _state = battle_screen_state::player_menu;
+                }
+                else
+                {
+                    display_msg_box("You won!");
+                }
+            }
+            else if(_state == battle_screen_state::to_game_over)
+            {
+                display_msg_box("Game over!");
+                app().pop_screen();
             }
         }
 
@@ -1759,29 +1770,125 @@ auto first_ai()
         auto& ps(bc.player().stats());
         auto& es(bc.enemy().stats());
 
+        if(es.health() <= es.maxhealth() * 0.2)
+        {
+            bs.display_msg_box("The demon attempts to heal himself!");
+            bc.heal_enemy_by(10);
+            bc.damage_enemy_shield_by(5);
+        }
+        else
+        {
+            bs.display_msg_box("The demon pounces at the player.");
+            bc.damage_player_by(30);
+            bc.damage_player_shield_by(3);
+        }
+
+        bs.end_enemy_turn();
+    };
+}
+
+auto second_ai()
+{
+    using namespace ggj16;
+
+    return [](battle_screen& bs, battle_context_t& bc)
+    {
+        auto& ps(bc.player().stats());
+        auto& es(bc.enemy().stats());
+
         if(es.health() <= es.maxhealth() * 0.3)
         {
             bs.display_msg_box("The demon attempts to heal himself!");
             bc.heal_enemy_by(12);
-            bc.damage_enemy_shield_by(3);
+            bc.damage_enemy_shield_by(4);
         }
-        else if(es.shield() <= es.maxshield() * 0.3)
-        {
-            bs.display_msg_box("The demon attempts to restore his shield!");
-            bc.heal_enemy_shield_by(8);
-            bc.damage_enemy_by(5);
-        }
-        else if(ps.shield() >= ps.shield() * 0.7)
+        else if(ps.shield() >= ps.shield() * 0.8)
         {
             bs.display_msg_box("The demon performs\nan armor-piercing attack!");
-            bc.damage_player_shield_by(15);
+            bc.damage_player_shield_by(20);
             bc.damage_player_by(5);
         }
         else
         {
             bs.display_msg_box("The demon pounces at the player.");
-            bc.damage_player_by(25);
-            bc.damage_player_shield_by(2);
+            bc.damage_player_by(35);
+            bc.damage_player_shield_by(4);
+        }
+
+        bs.end_enemy_turn();
+    };
+}
+
+auto third_ai()
+{
+    using namespace ggj16;
+
+    return [](battle_screen& bs, battle_context_t& bc)
+    {
+        auto& ps(bc.player().stats());
+        auto& es(bc.enemy().stats());
+
+        if(es.health() <= es.maxhealth() * 0.3)
+        {
+            bs.display_msg_box("The demon attempts to heal himself!");
+            bc.heal_enemy_by(14);
+            bc.damage_enemy_shield_by(3);
+        }
+        else if(es.shield() <= es.maxshield() * 0.2)
+        {
+            bs.display_msg_box("The demon attempts to restore his shield!");
+            bc.heal_enemy_shield_by(10);
+            bc.damage_enemy_by(5);
+        }
+        else if(ps.shield() >= ps.shield() * 0.7)
+        {
+            bs.display_msg_box("The demon performs\nan armor-piercing attack!");
+            bc.damage_player_shield_by(25);
+            bc.damage_player_by(7);
+        }
+        else
+        {
+            bs.display_msg_box("The demon pounces at the player.");
+            bc.damage_player_by(40);
+            bc.damage_player_shield_by(5);
+        }
+
+        bs.end_enemy_turn();
+    };
+}
+
+auto fourth_ai()
+{
+    using namespace ggj16;
+
+    return [](battle_screen& bs, battle_context_t& bc)
+    {
+        auto& ps(bc.player().stats());
+        auto& es(bc.enemy().stats());
+
+        if(es.health() <= es.maxhealth() * 0.3)
+        {
+            bs.display_msg_box("The demon attempts to heal himself!");
+            bc.heal_enemy_by(18);
+            bc.damage_enemy_shield_by(4);
+        }
+        else if(es.shield() <= es.maxshield() * 0.3)
+        {
+            bs.display_msg_box("The demon attempts to restore his shield!");
+            bc.heal_enemy_shield_by(20);
+            bc.damage_enemy_by(5);
+        }
+        else if(ps.shield() >= ps.shield() * 0.6)
+        {
+            bs.display_msg_box("The demon performs\nan armor-piercing attack!");
+            bc.damage_player_shield_by(30);
+            bc.damage_player_by(15);
+        }
+        else
+        {
+            bs.display_msg_box("The demon pounces at the player.");
+            bc.damage_player_by(50);
+            bc.damage_player_shield_by(7);
         }
 
         bs.end_enemy_turn();
@@ -1797,37 +1904,67 @@ int main()
         "ggj2016 temp", game_constants::width, game_constants::height};
     game_app& app(game.app());
 
-    character_stats cs0;
-    cs0.health() = 100;
-    cs0.shield() = 40;
-    cs0.power() = 10;
-    cs0.maxhealth() = 100;
-    cs0.maxshield() = 40;
-    cs0.mana() = 100;
-    cs0.maxmana() = 100;
-    battle_participant b0{cs0};
+    character_stats cs_demon0;
+    cs_demon0.health() = cs_demon0.maxhealth() = 75;
+    cs_demon0.shield() = cs_demon0.maxshield() = 35;
+    cs_demon0.mana() = cs_demon0.maxmana() = 100;
+    cs_demon0.power() = 10;
+    battle_participant demon0{cs_demon0};
+    cenemy_state es_d0{assets().d0};
+    es_d0._f_ai = first_ai();
 
-    character_stats cs1;
-    cs1.health() = 100;
-    cs1.shield() = 40;
-    cs1.power() = 10;
-    cs1.maxhealth() = 100;
-    cs1.maxshield() = 40;
-    cs1.mana() = 100;
-    cs1.maxmana() = 100;
-    battle_participant b1{cs1};
+    character_stats cs_demon1;
+    cs_demon1.health() = cs_demon1.maxhealth() = 100;
+    cs_demon1.shield() = cs_demon1.maxshield() = 45;
+    cs_demon1.mana() = cs_demon1.maxmana() = 200;
+    cs_demon1.power() = 20;
+    battle_participant demon1{cs_demon1};
+    cenemy_state es_d1{assets().d1};
+    es_d1._f_ai = second_ai();
 
+    character_stats cs_demon2;
+    cs_demon2.health() = cs_demon2.maxhealth() = 120;
+    cs_demon2.shield() = cs_demon2.maxshield() = 60;
+    cs_demon2.mana() = cs_demon2.maxmana() = 300;
+    cs_demon2.power() = 30;
+    battle_participant demon2{cs_demon2};
+    cenemy_state es_d2{assets().d2};
+    es_d2._f_ai = third_ai();
+
+    character_stats cs_demon3;
+    cs_demon3.health() = cs_demon3.maxhealth() = 160;
+    cs_demon3.shield() = cs_demon3.maxshield() = 80;
+    cs_demon3.mana() = cs_demon3.maxmana() = 400;
+    cs_demon3.power() = 40;
+    battle_participant demon3{cs_demon3};
+    cenemy_state es_d3{assets().d3};
+    es_d3._f_ai = fourth_ai();
+
+
+    character_stats cs_player;
+    cs_player.health() = cs_player.maxhealth() = 100;
+    cs_player.shield() = cs_player.maxshield() = 40;
+    cs_player.mana() = cs_player.maxmana() = 100;
+    cs_player.power() = 100;
+    battle_participant bplayer{cs_player};
     cplayer_state ps;
     fill_ps(ps);
 
-    cenemy_state es;
-    es._f_ai = first_ai();
+    battle_t b0{bplayer, demon0};
+    battle_context_t bc0{ps, es_d0, b0};
 
-    battle_t b{b0, b1};
-    battle_context_t b_ctx{ps, es, b};
+    battle_t b1{bplayer, demon1};
+    battle_context_t bc1{ps, es_d1, b1};
+
+    battle_t b2{bplayer, demon2};
+    battle_context_t bc2{ps, es_d2, b2};
+
+    battle_t b3{bplayer, demon3};
+    battle_context_t bc3{ps, es_d3, b3};
 
     auto& s_title(app.make_screen<title_screen>());
-    auto& s_battle(app.make_screen<battle_screen>(b_ctx));
+    auto& s_battle(app.make_screen<battle_screen>(
+        std::vector<battle_context_t*>{&bc0, &bc1, &bc2, &bc3}));
 
     s_title.on_start = [&]
     {
