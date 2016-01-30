@@ -13,6 +13,7 @@
 GGJ16_NAMESPACE
 {
     class cplayer_state;
+    class cenemy_state;
 
     class battle_t
     {
@@ -150,6 +151,7 @@ GGJ16_NAMESPACE
     {
     private:
         cplayer_state& _player_state;
+        cenemy_state& _enemy_state;
         battle_t _battle;
 
         void notify_damage(battle_event_type et, stat_value x)
@@ -177,13 +179,18 @@ GGJ16_NAMESPACE
     public:
         ssvu::Delegate<void(battle_event)> on_event;
 
-        battle_context_t(cplayer_state& player_state, const battle_t& battle)
-            : _player_state{player_state}, _battle{battle}
+        battle_context_t(cplayer_state& player_state, cenemy_state& enemy_state,
+            const battle_t& battle)
+            : _player_state{player_state}, _enemy_state{enemy_state},
+              _battle{battle}
         {
         }
 
         auto& player_state() noexcept { return _player_state; }
         const auto& player_state() const noexcept { return _player_state; }
+
+        auto& enemy_state() noexcept { return _enemy_state; }
+        const auto& enemy_state() const noexcept { return _enemy_state; }
 
         auto& battle() noexcept { return _battle; }
         const auto& battle() const noexcept { return _battle; }
@@ -214,13 +221,19 @@ GGJ16_NAMESPACE
 
         void heal_player_by(stat_value x)
         {
-            player().stats().health() += x;
+            auto& s(player().stats().health());
+            s += x;
+            ssvu::clampMax(s, player().stats().maxhealth());
+
             notify_heal(battle_event_type::player_healed, x);
         }
 
         void heal_enemy_by(stat_value x)
         {
-            enemy().stats().health() += x;
+            auto& s(enemy().stats().health());
+            s += x;
+            ssvu::clampMax(s, enemy().stats().maxhealth());
+
             notify_heal(battle_event_type::enemy_healed, x);
         }
 
@@ -244,13 +257,19 @@ GGJ16_NAMESPACE
 
         void heal_player_shield_by(stat_value x)
         {
-            player().stats().shield() += x;
+            auto& s(player().stats().shield());
+            s += x;
+            ssvu::clampMax(s, player().stats().maxshield());
+
             notify_heal(battle_event_type::player_shield_healed, x);
         }
 
         void heal_enemy_shield_by(stat_value x)
         {
-            enemy().stats().shield() += x;
+            auto& s(enemy().stats().shield());
+            s += x;
+            ssvu::clampMax(s, enemy().stats().maxshield());
+
             notify_heal(battle_event_type::enemy_shield_healed, x);
         }
 

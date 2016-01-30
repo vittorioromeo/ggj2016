@@ -17,7 +17,8 @@ GGJ16_NAMESPACE
         player_menu,
         player_ritual,
         enemy_turn,
-        before_enemy_turn
+        before_enemy_turn,
+        before_player_turn
     };
 
     enum class ritual_minigame_state
@@ -456,20 +457,32 @@ GGJ16_NAMESPACE
         auto& effect() { return _fn_effect; }
     };
 
+    class battle_screen;
+
+    struct cenemy_state
+    {
+        std::function<void(battle_screen&, battle_context_t&)> _f_ai;
+    };
+
     class cplayer_state
     {
     private:
-        std::vector<ritual_maker> _rituals;
+        std::vector<ritual_maker> _atk_rituals;
+        std::vector<ritual_maker> _utl_rituals;
         // vector of available items
 
     public:
-        cplayer_state() { _rituals.reserve(6); }
+        cplayer_state()
+        {
+            _atk_rituals.reserve(6);
+            _utl_rituals.reserve(6);
+        }
 
         template <typename T, typename TF0, typename TF1, typename... Ts>
-        void emplace_ritual(const std::string& label, ritual_type rt,
+        void emplace_atk_ritual(const std::string& label, ritual_type rt,
             float time, TF0&& f_init, TF1&& f_effect)
         {
-            _rituals.emplace_back(label, rt, time,
+            _atk_rituals.emplace_back(label, rt, time,
                 [f_init, rt]
                 {
                     auto uptr(std::make_unique<T>());
@@ -480,10 +493,30 @@ GGJ16_NAMESPACE
                 f_effect);
         }
 
-        template <typename TF>
-        void for_rituals(TF&& f)
+        template <typename T, typename TF0, typename TF1, typename... Ts>
+        void emplace_utl_ritual(const std::string& label, ritual_type rt,
+            float time, TF0&& f_init, TF1&& f_effect)
         {
-            for(auto& r : _rituals) f(r);
+            _utl_rituals.emplace_back(label, rt, time,
+                [f_init, rt]
+                {
+                    auto uptr(std::make_unique<T>());
+                    uptr->_type = rt;
+                    f_init(*uptr);
+                    return uptr;
+                },
+                f_effect);
+        }
+        template <typename TF>
+        void for_atk_rituals(TF&& f)
+        {
+            for(auto& r : _atk_rituals) f(r);
+        }
+
+        template <typename TF>
+        void for_utl_rituals(TF&& f)
+        {
+            for(auto& r : _utl_rituals) f(r);
         }
     };
 
@@ -686,7 +719,7 @@ GGJ16_NAMESPACE
         }
 
         virtual void draw(
-            sf::RenderTarget& target, sf::RenderStates states) const
+            sf::RenderTarget& target, sf::RenderStates states) const override
         {
             states.transform *= getTransform();
             target.draw(_bar_outl, states);
@@ -703,7 +736,7 @@ GGJ16_NAMESPACE
         stats_gfx() { _shield_b.setPosition(0, 60.f); }
 
         virtual void draw(
-            sf::RenderTarget& target, sf::RenderStates states) const
+            sf::RenderTarget& target, sf::RenderStates states) const override
         {
             states.transform *= getTransform();
             target.draw(_health_b, states);
@@ -720,17 +753,6 @@ GGJ16_NAMESPACE
     class battle_screen : public game_screen
     {
     public:
-        ssvs::Camera _hud_camera;
-        ssvs::Camera _real_camera;
-        /*
-                auto mp_hud() const noexcept { return
-           _hud_camera.getMousePosition(); }
-                auto mp_real() const noexcept
-                {
-                    return _real_camera.getMousePosition();
-                }*/
-
-    private:
         struct scripted_event
         {
             float _time;
@@ -752,8 +774,8 @@ GGJ16_NAMESPACE
         battle_menu_gfx_state _menu_gfx_state;
 
         battle_menu_screen* _m_main;
-        battle_menu_screen* _m_ritual;
-        battle_menu_screen* _m_item;
+        battle_menu_screen* _m_ritual_atk;
+        battle_menu_screen* _m_ritual_utl;
 
         battle_context_t _battle_context;
         battle_screen_state _state{battle_screen_state::player_menu};
@@ -880,6 +902,11 @@ GGJ16_NAMESPACE
             _state = battle_screen_state::before_enemy_turn;
         }
 
+        void end_enemy_turn()
+        {
+            _state = battle_screen_state::before_player_turn;
+        }
+
         void execute_ritual(ritual_maker rm)
         {
             add_scripted_text(1.7f, rm.label());
@@ -890,13 +917,13 @@ GGJ16_NAMESPACE
             _ritual_ctx.set_and_start_minigame(time_as_ft, rm.make());
         }
 
-        void fill_ritual_menu()
+        void fill_attack_menu()
         {
-            auto& m(*_m_ritual);
+            auto& m(*_m_ritual_atk);
             m.clear();
 
             auto& ps(_battle_context.player_state());
-            ps.for_rituals([this, &m](auto& rr)
+            ps.for_atk_rituals([this, &m](auto& rr)
                 {
                     m.emplace_choice(rr.label(), [this, &rr](auto& bm)
                         {
@@ -911,23 +938,21 @@ GGJ16_NAMESPACE
                 });
         }
 
-        void fill_item_menu()
+        void fill_utility_menu()
         {
-            auto& m(*_m_item);
+            auto& m(*_m_ritual_utl);
             m.clear();
 
-            m.emplace_choice("Item 0", [this](auto& bm)
+            auto& ps(_battle_context.player_state());
+            ps.for_utl_rituals([this, &m](auto& rr)
                 {
-                    bm.pop_screen();
+                    m.emplace_choice(rr.label(), [this, &rr](auto& bm)
+                        {
+                            this->execute_ritual(rr);
+                            bm.pop_screen();
+                        });
                 });
-            m.emplace_choice("Item 1", [this](auto& bm)
-                {
-                    bm.pop_screen();
-                });
-            m.emplace_choice("Item 2", [this](auto& bm)
-                {
-                    bm.pop_screen();
-                });
+
             m.emplace_choice("Go back", [](auto& bm)
                 {
                     bm.pop_screen();
@@ -948,34 +973,37 @@ GGJ16_NAMESPACE
             auto& m(*_m_main);
             m.clear();
 
-            m.emplace_choice("Perform ritual", [this](auto& bm)
+            m.emplace_choice("Attack rituals", [this](auto& bm)
                 {
-                    this->fill_ritual_menu();
-                    bm.push_screen(*_m_ritual);
+                    this->fill_attack_menu();
+                    bm.push_screen(*_m_ritual_atk);
                 });
-            m.emplace_choice("Use item", [this](auto& bm)
+            m.emplace_choice("Utility rituals", [this](auto& bm)
                 {
-                    this->fill_item_menu();
-                    bm.push_screen(*_m_item);
+                    this->fill_utility_menu();
+                    bm.push_screen(*_m_ritual_utl);
                 });
             m.emplace_choice("Inspect enemy", [this](auto&)
                 {
-                    this->display_msg_box(
-                        "Inspecting "
-                        "enemy.."
-                        "aajsgois\ndajgiodsajgsadi\nogjdsaijgpadsjgpsadgoksda"
-                        "pgks"
-                        "da"
-                        "gopdsagksad\npgksadgsadkgsadpgksadp\ngkasdopgksdapgs"
-                        "d");
+                    const auto& es(_battle_context.enemy().stats());
+
+                    std::ostringstream oss;
+                    oss << "Inspecting enemy...\n\n";
+                    oss << "Health: " << es.health() << " / " << es.maxhealth()
+                        << "\n";
+                    oss << "Shield: " << es.shield() << " / " << es.maxshield()
+                        << "\n";
+                    oss << "Power: " << es.power() << "\n";
+
+                    this->display_msg_box(oss.str());
                 });
         }
 
         void init_menu()
         {
             _m_main = &_menu.make_screen();
-            _m_ritual = &_menu.make_screen();
-            _m_item = &_menu.make_screen();
+            _m_ritual_atk = &_menu.make_screen();
+            _m_ritual_utl = &_menu.make_screen();
 
             fill_main_menu();
 
@@ -1044,6 +1072,7 @@ GGJ16_NAMESPACE
         void draw_ritual() { _ritual_ctx.draw(); }
 
         void update_enemy(ft) {}
+
         void draw_enemy() {}
 
         void update_scripted_events(ft dt)
@@ -1232,8 +1261,6 @@ GGJ16_NAMESPACE
     public:
         battle_screen(game_app& app, battle_context_t& battle_context) noexcept
             : base_type(app),
-              _hud_camera{app.window(), 2.f},
-              _real_camera{app.window()},
               _battle_context{battle_context},
               _ritual_ctx{app}
         {
@@ -1247,8 +1274,6 @@ GGJ16_NAMESPACE
 
         void update(ft dt) override
         {
-            // ssvu::lo() << app().mp() << "\n";
-
             update_stat_bars();
 
             if(!_scripted_events.empty())
@@ -1276,12 +1301,18 @@ GGJ16_NAMESPACE
             }
             else if(_state == battle_screen_state::enemy_turn)
             {
-                update_enemy(dt);
+                // update_enemy(dt);
+                _battle_context.enemy_state()._f_ai(*this, _battle_context);
             }
             else if(_state == battle_screen_state::before_enemy_turn)
             {
                 add_scripted_text(1.7f, "Enemy turn!");
                 _state = battle_screen_state::enemy_turn;
+            }
+            else if(_state == battle_screen_state::before_player_turn)
+            {
+                add_scripted_text(1.7f, "Player turn!");
+                _state = battle_screen_state::player_menu;
             }
         }
 
@@ -1314,6 +1345,126 @@ GGJ16_NAMESPACE
 }
 GGJ16_NAMESPACE_END
 
+void fill_ps(ggj16::cplayer_state& ps)
+{
+    using namespace ggj16;
+
+    ps.emplace_atk_ritual<symbol_ritual>("Fireball", ritual_type::complete, 4,
+        [](symbol_ritual& sr)
+        {
+            sr.add_point({{-30.f * 2.8f, 60.f * 2.8f}, 10.f});
+            sr.add_point({{0.f * 2.8f, -60.f * 2.8f}, 10.f});
+            sr.add_point({{30.f * 2.8f, 60.f * 2.8f}, 10.f});
+            sr.add_point({{-50.f * 2.8f, -10.f * 2.8f}, 10.f});
+            sr.add_point({{50.f * 2.8f, -10.f * 2.8f}, 10.f});
+        },
+        [](battle_context_t& c)
+        {
+            c.damage_enemy_by(20);
+        });
+
+    ps.emplace_atk_ritual<aura_ritual>("Rend shield", ritual_type::resist, 6,
+        [](aura_ritual& sr)
+        {
+            sr.add_point({{-0.f, -45.f * 2.8f}, 20.f});
+            sr.add_point({{-31.f * 2.8f, 31.f * 2.8f}, 20.f});
+            sr.add_point({{31.f * 2.8f, 31.f * 2.8f}, 20.f});
+        },
+        [](battle_context_t& c)
+        {
+            c.damage_enemy_by(5);
+            c.damage_enemy_shield_by(25);
+        });
+
+    ps.emplace_atk_ritual<symbol_ritual>("Obliterate", ritual_type::complete, 3,
+        [](symbol_ritual& sr)
+        {
+            auto x(-1024 / 2.f);
+            auto y(-768 / 2.f);
+            int x_count = 6;
+            int y_count = 3;
+            auto offset = 40.f;
+
+            auto fullx = game_constants::width - offset * 2;
+            auto fully = game_constants::height - offset * 2;
+
+            auto xinc(fullx / x_count);
+            auto yinc(fully / y_count);
+
+
+            for(int ix = 0; ix < x_count; ++ix)
+            {
+                sr.add_point({{x + offset + xinc * ix, y + offset}, 12.f});
+            }
+
+            for(int iy = 0; iy < y_count + 1; ++iy)
+            {
+                sr.add_point(
+                    {{x + offset + fullx, y + offset + yinc * iy}, 12.f});
+            }
+
+
+            for(int ix = x_count - 1; ix >= 0; --ix)
+            {
+                sr.add_point({{x + offset + xinc * ix,
+                                  y + game_constants::height - offset},
+                    12.f});
+            }
+
+            for(int iy = y_count - 1; iy > 0; --iy)
+            {
+                sr.add_point({{x + offset, y + offset + yinc * iy}, 12.f});
+            }
+        },
+        [](battle_context_t& c)
+        {
+            c.damage_enemy_shield_by(10);
+            c.damage_enemy_by(60);
+        });
+
+    ps.emplace_utl_ritual<drag_ritual>("Heal", ritual_type::complete, 5,
+        [](drag_ritual& sr)
+        {
+            sr.add_target(
+                {game_constants::width / 2.f, game_constants::height / 2.f});
+
+            for(int i = 0; i < 6; ++i)
+            {
+                auto offset(20.f * 2.8f);
+                auto x(ssvu::getRndR(offset, game_constants::width - offset));
+                auto y(ssvu::getRndR(offset, game_constants::height - offset));
+                sr.add_draggable(vec2f{x, y});
+            }
+        },
+        [](battle_context_t& c)
+        {
+            c.damage_player_shield_by(15);
+            c.heal_player_by(75);
+        });
+
+    ps.emplace_utl_ritual<drag_ritual>("Repair shield", ritual_type::complete,
+        6,
+        [](drag_ritual& sr)
+        {
+            sr.add_target(
+                {game_constants::width / 2.f, game_constants::height / 2.f});
+
+            for(int i = 0; i < 3; ++i)
+            {
+                auto offset(20.f * 2.8f);
+                sr.add_draggable(vec2f{offset, offset + (i * 60)});
+                sr.add_draggable(
+                    vec2f{game_constants::width - offset, offset + (i * 60)});
+            }
+        },
+        [](battle_context_t& c)
+        {
+            c.damage_player_by(5);
+            c.heal_player_shield_by(45);
+        });
+}
+
+
 int main()
 {
     using namespace ggj16;
@@ -1340,55 +1491,18 @@ int main()
     battle_participant b1{cs1};
 
     cplayer_state ps;
-    ps.emplace_ritual<symbol_ritual>("Fireball", ritual_type::complete, 4,
-        [](symbol_ritual& sr)
-        {
-            sr.add_point({{-30.f * 2.8f, 60.f * 2.8f}, 10.f});
-            sr.add_point({{0.f * 2.8f, -60.f * 2.8f}, 10.f});
-            sr.add_point({{30.f * 2.8f, 60.f * 2.8f}, 10.f});
-            sr.add_point({{-50.f * 2.8f, -10.f * 2.8f}, 10.f});
-            sr.add_point({{50.f * 2.8f, -10.f * 2.8f}, 10.f});
-        },
-        [](battle_context_t& c)
-        {
-            c.damage_enemy_by(50);
-        });
+    fill_ps(ps);
 
-    ps.emplace_ritual<aura_ritual>("Rend armor", ritual_type::resist, 6,
-        [](aura_ritual& sr)
-        {
-            sr.add_point({{-0.f, -45.f * 2.8f}, 20.f});
-            sr.add_point({{-31.f * 2.8f, 31.f * 2.8f}, 20.f});
-            sr.add_point({{31.f * 2.8f, 31.f * 2.8f}, 20.f});
-        },
-        [](battle_context_t& c)
-        {
-            c.damage_enemy_by(5);
-            c.damage_enemy_shield_by(25);
-        });
-
-    ps.emplace_ritual<drag_ritual>("Heal", ritual_type::complete, 5,
-        [](drag_ritual& sr)
-        {
-            sr.add_target(
-                {game_constants::width / 2.f, game_constants::height / 2.f});
-
-            for(int i = 0; i < 6; ++i)
-            {
-                auto offset(20.f * 2.8f);
-                auto x(ssvu::getRndR(offset, game_constants::width - offset));
-                auto y(ssvu::getRndR(offset, game_constants::height - offset));
-                sr.add_draggable(vec2f{x, y});
-            }
-        },
-        [](battle_context_t& c)
-        {
-            c.damage_player_shield_by(15);
-            c.heal_player_by(75);
-        });
+    cenemy_state es;
+    es._f_ai = [](battle_screen& bs, battle_context_t& bc)
+    {
+        bs.display_msg_box("Test");
+        bc.damage_player_by(10);
+        bs.end_enemy_turn();
+    };
 
     battle_t b{b0, b1};
-    battle_context_t b_ctx{ps, b};
+    battle_context_t b_ctx{ps, es, b};
 
     auto& test_battle(app.make_screen<battle_screen>(b_ctx));
     app.push_screen(test_battle);
