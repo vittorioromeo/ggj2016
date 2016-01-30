@@ -27,6 +27,8 @@ GGJ16_NAMESPACE
         invalid
     };
 
+    class battle_ritual_context;
+
     namespace impl
     {
         class ritual_minigame_base
@@ -34,6 +36,10 @@ GGJ16_NAMESPACE
         private:
             ritual_minigame_state _state{ritual_minigame_state::invalid};
             float _time_left;
+
+        public:
+            battle_ritual_context* _ctx;
+            game_app& app() noexcept;
 
         protected:
             void time_out() { _state = ritual_minigame_state::timed_out; }
@@ -66,6 +72,84 @@ GGJ16_NAMESPACE
     }
 
     using ritual_uptr = std::unique_ptr<impl::ritual_minigame_base>;
+
+    struct symbol_point
+    {
+        vec2f _p;
+        float _radius{6.f};
+    };
+
+    class symbol_ritual : public impl::ritual_minigame_base
+    {
+    private:
+        using base_type = impl::ritual_minigame_base;
+
+        int next_id{1};
+        vec2f _center{320 / 2.f, 240 / 2.f};
+        std::vector<sf::CircleShape> _pshapes;
+        std::vector<ssvs::BitmapText> _ptexts;
+
+        auto is_shape_hovered(const sf::CircleShape& cs) noexcept
+        {
+            auto mp(app().window().getMousePosition());
+            return ssvs::getDistEuclidean(mp, cs.getPosition()) <
+                   cs.getRadius();
+        }
+
+    public:
+        void add_point(const symbol_point& sp)
+        {
+            // Add shape
+            _pshapes.emplace_back();
+            auto& s(_pshapes.back());
+            s.setFillColor(sfc::Red);
+            s.setOutlineThickness(1);
+            s.setOutlineColor(sfc::Black);
+            s.setRadius(sp._radius);
+            ssvs::setOrigin(s, ssvs::getLocalCenter);
+            s.setPosition(_center + sp._p);
+
+            // Add text
+            _ptexts.emplace_back(mkTxtOBSmall());
+            auto& t(_ptexts.back());
+            t.setString(std::to_string(next_id++));
+            ssvs::setOrigin(t, ssvs::getLocalCenter);
+            t.setPosition(s.getPosition());
+        }
+
+        void update(ft dt) override
+        {
+            base_type::update(dt);
+
+            for(auto& s : _pshapes)
+            {
+                if(is_shape_hovered(s))
+                {
+                    s.setFillColor(sfc::Green);
+                }
+                else
+                {
+                    s.setFillColor(sfc::Red);
+                }
+            }
+
+            for(auto& t : _ptexts)
+            {
+            }
+        }
+        void draw() override
+        {
+            for(auto& s : _pshapes)
+            {
+                app().render(s);
+            }
+
+            for(auto& t : _ptexts)
+            {
+                app().render(t);
+            }
+        }
+    };
 
     class example_ritual : public impl::ritual_minigame_base
     {
@@ -106,12 +190,14 @@ GGJ16_NAMESPACE
     public:
         cplayer_state() { _rituals.reserve(6); }
 
-        template <typename T, typename... Ts>
-        void emplace_ritual(const std::string& label, float time)
+        template <typename T, typename TF, typename... Ts>
+        void emplace_ritual(const std::string& label, float time, TF&& f_init)
         {
-            _rituals.emplace_back(label, time, []
+            _rituals.emplace_back(label, time, [f_init]
                 {
-                    return std::make_unique<T>();
+                    auto uptr(std::make_unique<T>());
+                    f_init(*uptr);
+                    return uptr;
                 });
         }
 
@@ -151,6 +237,8 @@ GGJ16_NAMESPACE
         }
 
     public:
+        auto& app() noexcept { return _app; }
+
         battle_ritual_context(game_app& app) : _app(app) { init_text(); }
 
         auto is_timed_out() const noexcept
@@ -183,6 +271,7 @@ GGJ16_NAMESPACE
         {
             _minigame = std::move(x);
             _minigame->start_minigame(time_as_ft);
+            _minigame->_ctx = this;
         }
 
         void update(ft dt)
@@ -207,6 +296,15 @@ GGJ16_NAMESPACE
             _app.render(_tr);
         }
     };
+
+    namespace impl
+    {
+        game_app& ritual_minigame_base::app() noexcept
+        {
+            assert(_ctx != nullptr);
+            return _ctx->app();
+        }
+    }
 
     class battle_screen;
 
@@ -570,7 +668,14 @@ int main()
     battle_participant b1{cs1};
 
     cplayer_state ps;
-    ps.emplace_ritual<example_ritual>("Fireball", 4);
+    ps.emplace_ritual<symbol_ritual>("Fireball", 4, [](symbol_ritual& sr)
+        {
+            sr.add_point({{-20.f, 60.f}, 10.f});
+            sr.add_point({{0.f, -60.f}, 10.f});
+            sr.add_point({{20.f, 60.f}, 10.f});
+            sr.add_point({{-50.f, -20.f}, 10.f});
+            sr.add_point({{50.f, -20.f}, 10.f});
+        });
 
     battle_t b{b0, b1};
     battle_context_t b_ctx{ps, b};
@@ -581,3 +686,4 @@ int main()
     game.run();
     return 0;
 }
+
