@@ -11,10 +11,12 @@ GGJ16_NAMESPACE
         shield = 1,
         power = 2,
         maxhealth = 3,
-        maxshield = 4
+        maxshield = 4,
+        mana = 5,
+        maxmana = 6
     };
 
-    constexpr sz_t stat_count{5};
+    constexpr sz_t stat_count{7};
 
     using stat_value = float;
 

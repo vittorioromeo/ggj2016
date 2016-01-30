@@ -186,11 +186,13 @@ GGJ16_NAMESPACE
                     _camera.setCenter(orig_camera_pos);
                     _shake = 0;
                 }
+
+                _camera.update(dt);
             };
 
             state().onDraw += [this]
             {
-                _camera.apply();
+                _camera.template apply<int>();
                 _screen_manager.draw(window());
                 _camera.unapply();
             };
@@ -208,6 +210,11 @@ GGJ16_NAMESPACE
         auto lb_down() const noexcept
         {
             return window().getInputState()[ssvs::MBtn::Left];
+        }
+
+        auto rb_down() const noexcept
+        {
+            return window().getInputState()[ssvs::MBtn::Right];
         }
 
         template <typename T, typename... Ts>

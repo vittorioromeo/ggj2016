@@ -22,17 +22,20 @@ GGJ16_NAMESPACE
     {
     private:
         std::string _label;
+        std::string _desc;
         battle_menu_choice_fn _fn;
 
     public:
         template <typename TF>
-        battle_menu_choice(const std::string& label, TF&& fn)
-            : _label{label}, _fn{fn}
+        battle_menu_choice(
+            const std::string& label, const std::string& desc, TF&& fn)
+            : _label{label}, _desc{desc}, _fn{fn}
         {
         }
 
         void execute(battle_menu& bm) const { _fn(bm); }
         const auto& label() const noexcept { return _label; }
+        const auto& desc() const noexcept { return _desc; }
     };
 
     using choice_set = std::vector<std::unique_ptr<battle_menu_choice>>;
@@ -111,11 +114,14 @@ GGJ16_NAMESPACE
         }
     };
 
+    class battle_screen;
+
     class battle_menu_gfx_button
     {
     private:
         sf::RectangleShape _shape;
         ssvs::BitmapTextRich _tr{*assets().fontObStroked};
+        battle_screen& _bs;
         vec2f _pos;
         const battle_menu_choice& _bmc;
 
@@ -136,8 +142,9 @@ GGJ16_NAMESPACE
     public:
         static constexpr float btn_w{120.f * 2.f};
         static constexpr float btn_h{20.f * 2.f};
-        battle_menu_gfx_button(const vec2f& pos, const battle_menu_choice& bmc)
-            : _pos(pos), _bmc(bmc)
+        battle_menu_gfx_button(
+            battle_screen& bs, const vec2f& pos, const battle_menu_choice& bmc)
+            : _bs{bs}, _pos(pos), _bmc(bmc)
         {
             _tr.setAlign(ssvs::TextAlign::Center);
             _tr.eff<BTR::Tracking>(-3).in(_bmc.label()).mk("");
@@ -148,30 +155,7 @@ GGJ16_NAMESPACE
             // _shape.setOrigin(shape_sz / 2.f);
         }
 
-        void update(game_app& app, battle_menu& bm, ft dt)
-        {
-            _shape.setPosition(_pos);
-            _shape.setFillColor(is_hovered(app) ? sfc::Green : sfc::Red);
-
-            auto lbtn_down(app.lb_down());
-
-            if(is_hovered(app) && !bm._was_pressed && lbtn_down)
-            {
-                bm._was_pressed = true;
-                _bmc.execute(bm);
-            }
-
-            if(!lbtn_down)
-            {
-                bm._was_pressed = false;
-            }
-
-            _tr.setPosition(_pos + vec2f(5.f, 5.f));
-
-            ssvs::setOrigin(_tr, ssvs::getLocalCenter);
-            _tr.setPosition(ssvs::getGlobalCenter(_shape));
-            _tr.update(dt);
-        }
+        void update(game_app& app, battle_menu& bm, ft dt);
 
         void draw(sf::RenderTarget& rt)
         {
@@ -185,7 +169,7 @@ GGJ16_NAMESPACE
     private:
         std::vector<battle_menu_gfx_button> _buttons;
 
-        void rebuild_from(const battle_menu_screen& bs)
+        void rebuild_from(battle_screen& b, const battle_menu_screen& bs)
         {
             _buttons.clear();
 
@@ -194,7 +178,8 @@ GGJ16_NAMESPACE
             auto menu_start_y(game_constants::height - menu_h);
             auto menu_end_y(
                 game_constants::height - battle_menu_gfx_button::btn_h);
-            auto menu_end_x(game_constants::width - battle_menu_gfx_button::btn_w);
+            auto menu_end_x(
+                game_constants::width - battle_menu_gfx_button::btn_w);
             auto offset(30.f);
 
             std::array<vec2f, 4> poss{
@@ -205,9 +190,9 @@ GGJ16_NAMESPACE
             };
 
             int i = 0;
-            bs.for_choices([this, &i, &poss](const auto& cc)
+            bs.for_choices([this, &i, &poss, &b](const auto& cc)
                 {
-                    _buttons.emplace_back(poss[i], cc);
+                    _buttons.emplace_back(b, poss[i], cc);
                     ++i;
                 });
         }
@@ -218,11 +203,11 @@ GGJ16_NAMESPACE
     public:
         battle_menu_gfx_state() { _buttons.reserve(10); }
 
-        void rebuild_from(const battle_menu& bm)
+        void rebuild_from(battle_screen& bs, const battle_menu& bm)
         {
-            _reb_fn = [this, &bm]
+            _reb_fn = [this, &bs, &bm]
             {
-                rebuild_from(bm.current_screen());
+                rebuild_from(bs, bm.current_screen());
             };
             _must_reb = true;
         }
