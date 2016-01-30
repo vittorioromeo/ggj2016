@@ -35,7 +35,7 @@ GGJ16_NAMESPACE
             // Sounds
             CACHE_ASSETS(sf::SoundBuffer, ".ogg", click0, enemy_atk0,
                 enemy_atk1, msgbox, shield_up, fireball, obliterate, success,
-                failure, scripted_text, blip)
+                failure, scripted_text, blip, bip)
 
             /*
     std::vector<sf::SoundBuffer *> swordSnds, maceSnds, spearSnds;

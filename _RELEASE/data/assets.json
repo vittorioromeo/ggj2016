@@ -13,7 +13,9 @@
 "enemy_atk0.ogg",
 "fireball.ogg",
 "obliterate.ogg",
-"success.ogg"
+"success.ogg",
+"blip.ogg",
+"scripted_text.ogg"
     ],
     "musics":
     [

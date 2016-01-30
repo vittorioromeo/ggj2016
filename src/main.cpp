@@ -179,7 +179,11 @@ GGJ16_NAMESPACE
 
                 if(all_hit_before(i) && is_shape_hovered(s))
                 {
-                    h = 1;
+                    if(h == 0)
+                    {
+                        assets().psnd(assets().blip);
+                        h = 1;
+                    }
                 }
 
                 if(h == 1)
@@ -261,6 +265,8 @@ GGJ16_NAMESPACE
 
                 if(is_shape_hovered(s))
                 {
+                    assets().psnd(assets().bip);
+
                     s.setFillColor(sfc::Green);
                     s.setRadius(
                         std::min(75.f, std::abs(s.getRadius() + dt * 2.78f)));
@@ -385,6 +391,7 @@ GGJ16_NAMESPACE
                 {
                     s.setFillColor(sfc::Green);
                     _curr = i;
+                    assets().psnd(assets().bip);
                 }
 
                 if(_curr == i && _phits[i] == 0)
@@ -395,10 +402,12 @@ GGJ16_NAMESPACE
 
                 for(auto& t : _ptargets)
                 {
-                    if(is_in_target(s, t))
+                    if(is_in_target(s, t) && _phits[i] == 0)
                     {
                         s.setRadius(0.f);
                         _phits[i] = 1;
+                        assets().psnd(assets().blip);
+
                         if(_curr == i)
                         {
                             _curr = -1;
@@ -907,10 +916,16 @@ GGJ16_NAMESPACE
 
         void add_scripted_text(float time, const std::string& s)
         {
-            assets().psnd(assets().scripted_text);
+            bool plyd{false};
             add_scripted_event(time,
-                [this, time, s](float t, ft dt)
+                [this, time, s, plyd](float t, ft dt) mutable
                 {
+                    if(!plyd)
+                    {
+                        assets().psnd(assets().scripted_text);
+                        plyd = true;
+                    }
+
                     ssvs::setOrigin(_t_cs, ssvs::getLocalCenter);
                     _t_cs.setAlign(ssvs::TextAlign::Center);
                     _t_cs.setPosition(game_constants::width / 2.f,
@@ -1391,8 +1406,9 @@ GGJ16_NAMESPACE
             if(_enemy_shake > 0)
             {
                 _enemy_shake -= dt;
-                auto s(_enemy_shake);
-                vec2f offset(ssvu::getRndR(-s, s), ssvu::getRndR(-s, s));
+                auto s(std::abs(_enemy_shake));
+                vec2f offset(
+                    ssvu::getRndR(-s, s + 0.1f), ssvu::getRndR(-s, s + 0.1f));
                 _enemy.setPosition(_esprite_pos + offset);
             }
             else
