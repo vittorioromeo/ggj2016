@@ -907,6 +907,7 @@ GGJ16_NAMESPACE
 
         void add_scripted_text(float time, const std::string& s)
         {
+            assets().psnd(assets().scripted_text);
             add_scripted_event(time,
                 [this, time, s](float t, ft dt)
                 {
@@ -1498,6 +1499,7 @@ GGJ16_NAMESPACE
         {
             if(lbtn_down)
             {
+                assets().psnd(assets().blip);
                 bm._was_pressed = true;
                 _bmc.execute(bm);
             }
@@ -1506,6 +1508,7 @@ GGJ16_NAMESPACE
                 const auto& d(_bmc.desc());
                 if(d != "")
                 {
+                    assets().psnd(assets().blip);
                     bm._was_pressed = true;
                     _bs.display_msg_box(d);
                 }
