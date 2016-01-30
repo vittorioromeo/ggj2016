@@ -144,7 +144,7 @@ GGJ16_NAMESPACE
             s.setFillColor(sfc::Red);
             s.setOutlineThickness(2);
             s.setOutlineColor(sfc::Black);
-            s.setRadius(sp._radius);
+            s.setRadius(sp._radius * 2.8f);
             ssvs::setOrigin(s, ssvs::getLocalCenter);
             s.setPosition(_center + sp._p);
 
@@ -152,6 +152,7 @@ GGJ16_NAMESPACE
             _ptexts.emplace_back(mkTxtOBSmall());
             auto& t(_ptexts.back());
             t.setString(std::to_string(next_id++));
+            t.setScale(vec2f(3.f, 3.f));
             ssvs::setOrigin(t, ssvs::getLocalCenter);
             t.setPosition(s.getPosition());
 
@@ -234,9 +235,9 @@ GGJ16_NAMESPACE
             _pshapes.emplace_back();
             auto& s(_pshapes.back());
             s.setFillColor(sfc::Red);
-            s.setOutlineThickness(1);
+            s.setOutlineThickness(3);
             s.setOutlineColor(sfc::Black);
-            s.setRadius(sp._radius);
+            s.setRadius(sp._radius * 2.8f);
             ssvs::setOrigin(s, ssvs::getLocalCenter);
             s.setPosition(_center + sp._p);
         }
@@ -261,13 +262,13 @@ GGJ16_NAMESPACE
                 {
                     s.setFillColor(sfc::Green);
                     s.setRadius(
-                        std::min(35.f, std::abs(s.getRadius() + dt * 1.8f)));
+                        std::min(120.f, std::abs(s.getRadius() + dt * 2.8f)));
                 }
                 else
                 {
                     s.setFillColor(sfc::Red);
                     s.setRadius(
-                        std::max(0.f, std::abs(s.getRadius() - (dt * 0.3f))));
+                        std::max(0.f, std::abs(s.getRadius() - (dt * 0.6f))));
                 }
             }
         }
@@ -320,7 +321,7 @@ GGJ16_NAMESPACE
             const sf::CircleShape& cs, const sf::RectangleShape rs)
         {
             return ssvs::getDistEuclidean(cs.getPosition(), rs.getPosition()) <
-                   20.f;
+                   20.f * 3.f;
         }
 
         auto all_hit() const noexcept
@@ -339,8 +340,8 @@ GGJ16_NAMESPACE
 
             t.setFillColor(sfc::Black);
             t.setOutlineColor(sfc::White);
-            t.setOutlineThickness(4.f);
-            t.setSize(vec2f(26, 26));
+            t.setOutlineThickness(10.f);
+            t.setSize(vec2f(26 * 3.f, 26 * 3.f));
             ssvs::setOrigin(t, ssvs::getLocalCenter);
             t.setPosition(p);
         }
@@ -353,8 +354,8 @@ GGJ16_NAMESPACE
 
             t.setFillColor(sfc::Red);
             t.setOutlineColor(sfc::Black);
-            t.setOutlineThickness(2.f);
-            t.setRadius(10.f);
+            t.setOutlineThickness(4.f);
+            t.setRadius(7.f * 3.f);
             ssvs::setOrigin(t, ssvs::getLocalCenter);
             t.setPosition(p);
         }
@@ -1255,11 +1256,11 @@ int main()
     ps.emplace_ritual<symbol_ritual>("Fireball", ritual_type::complete, 4,
         [](symbol_ritual& sr)
         {
-            sr.add_point({{-30.f, 60.f}, 10.f});
-            sr.add_point({{0.f, -60.f}, 10.f});
-            sr.add_point({{30.f, 60.f}, 10.f});
-            sr.add_point({{-50.f, -10.f}, 10.f});
-            sr.add_point({{50.f, -10.f}, 10.f});
+            sr.add_point({{-30.f * 2.8f, 60.f * 2.8f}, 10.f});
+            sr.add_point({{0.f * 2.8f, -60.f * 2.8f}, 10.f});
+            sr.add_point({{30.f * 2.8f, 60.f * 2.8f}, 10.f});
+            sr.add_point({{-50.f * 2.8f, -10.f * 2.8f}, 10.f});
+            sr.add_point({{50.f * 2.8f, -10.f * 2.8f}, 10.f});
         },
         [](battle_context_t& c)
         {
@@ -1269,9 +1270,9 @@ int main()
     ps.emplace_ritual<aura_ritual>("Rend armor", ritual_type::resist, 6,
         [](aura_ritual& sr)
         {
-            sr.add_point({{-0.f, -45.f}, 20.f});
-            sr.add_point({{-31.f, 31.f}, 20.f});
-            sr.add_point({{31.f, 31.f}, 20.f});
+            sr.add_point({{-0.f, -45.f * 2.8f}, 20.f});
+            sr.add_point({{-31.f * 2.8f, 31.f * 2.8f}, 20.f});
+            sr.add_point({{31.f * 2.8f, 31.f * 2.8f}, 20.f});
         },
         [](battle_context_t& c)
         {
@@ -1287,7 +1288,7 @@ int main()
 
             for(int i = 0; i < 6; ++i)
             {
-                auto offset(20.f);
+                auto offset(20.f * 2.8f);
                 auto x(ssvu::getRndR(offset, game_constants::width - offset));
                 auto y(ssvu::getRndR(offset, game_constants::height - offset));
                 sr.add_draggable(vec2f{x, y});
