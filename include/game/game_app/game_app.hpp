@@ -12,6 +12,7 @@ GGJ16_NAMESPACE
         game_app& _app;
         bool _pass_through{true};
         float _opacity_block{175};
+        bool _dead{false};
 
     public:
         game_screen(game_app& app) noexcept : _app(app) {}
@@ -21,7 +22,10 @@ GGJ16_NAMESPACE
         virtual void update(ft) {}
         virtual void draw() {}
 
-        auto& app() { return _app; }
+        game_app& app() { return _app; }
+
+        void kill() { _dead = true; }
+        const auto& dead() const noexcept { return _dead; }
 
         void set_pass_through(bool x) noexcept { _pass_through = x; }
         const auto& pass_through() const noexcept { return _pass_through; }
@@ -66,6 +70,15 @@ GGJ16_NAMESPACE
 
             void update(ft dt) noexcept
             {
+                ssvu::eraseRemoveIf(_screen_stack, [](const auto& s)
+                    {
+                        return s->dead();
+                    });
+                ssvu::eraseRemoveIf(_screen_storage, [](const auto& s)
+                    {
+                        return s->dead();
+                    });
+
                 if(!has_any_screen()) return;
                 current_screen().update(dt);
             }
@@ -180,6 +193,11 @@ GGJ16_NAMESPACE
             : boilerplate::app{window}
         {
             init_loops();
+        }
+
+        auto lb_down() const noexcept
+        {
+            return window().getInputState()[ssvs::MBtn::Left];
         }
 
         template <typename T, typename... Ts>

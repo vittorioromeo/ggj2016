@@ -420,6 +420,10 @@ GGJ16_NAMESPACE
         }
     };
 
+    class battle_participant;
+
+    using ritual_effect_fn = std::function<void(
+        cplayer_state&, battle_participant&, battle_participant&)>;
 
     class ritual_maker
     {
@@ -428,12 +432,14 @@ GGJ16_NAMESPACE
         ritual_type _type;
         float _time;
         std::function<ritual_uptr()> _fn_make;
+        ritual_effect_fn _fn_effect;
 
     public:
-        template <typename TF>
-        ritual_maker(
-            const std::string& label, ritual_type type, float time, TF&& f)
-            : _label{label}, _type{type}, _time{time}, _fn_make(f)
+        template <typename TF0, typename TF1>
+        ritual_maker(const std::string& label, ritual_type type, float time,
+            TF0&& f, TF1&& f_eff)
+            : _label{label}, _type{type}, _time{time}, _fn_make(f),
+              _fn_effect(f_eff)
         {
         }
 
@@ -442,6 +448,7 @@ GGJ16_NAMESPACE
         const auto& label() const noexcept { return _label; }
 
         auto make() { return _fn_make(); }
+        auto& effect() { return _fn_effect; }
     };
 
     class cplayer_state
@@ -453,17 +460,19 @@ GGJ16_NAMESPACE
     public:
         cplayer_state() { _rituals.reserve(6); }
 
-        template <typename T, typename TF, typename... Ts>
-        void emplace_ritual(
-            const std::string& label, ritual_type rt, float time, TF&& f_init)
+        template <typename T, typename TF0, typename TF1, typename... Ts>
+        void emplace_ritual(const std::string& label, ritual_type rt,
+            float time, TF0&& f_init, TF1&& f_effect)
         {
-            _rituals.emplace_back(label, rt, time, [f_init, rt]
+            _rituals.emplace_back(label, rt, time,
+                [f_init, rt]
                 {
                     auto uptr(std::make_unique<T>());
                     uptr->_type = rt;
                     f_init(*uptr);
                     return uptr;
-                });
+                },
+                f_effect);
         }
 
         template <typename TF>
@@ -524,13 +533,6 @@ GGJ16_NAMESPACE
             return _minigame->state() == ritual_minigame_state::success;
         }
 
-        /* template <typename T, typename... Ts>
-         void start_new_minigame(float time_left, Ts&&... xs)
-         {
-             _minigame = std::make_unique<T>(FWD(xs)...);
-             _minigame->start_minigame(time_left);
-         }*/
-
         template <typename T>
         void set_and_start_minigame(float time_as_ft, T&& x)
         {
@@ -571,6 +573,71 @@ GGJ16_NAMESPACE
         }
     }
 
+    namespace impl
+    {
+        class single_stat_display
+        {
+        private:
+            ssvs::BitmapText _t{mkTxtOBSmall()};
+
+        public:
+        };
+    }
+
+    class msgbox_screen : public game_screen
+    {
+    private:
+        using base_type = game_screen;
+
+        sf::RectangleShape _bg;
+        ssvs::BitmapTextRich _btr{*assets().fontObStroked};
+        float _safety_time{100};
+
+        void init_bg()
+        {
+            _bg.setSize(vec2f(220, 120));
+            _bg.setFillColor(sfc::Black);
+            _bg.setOutlineColor(sfc::White);
+            _bg.setOutlineThickness(3);
+            ssvs::setOrigin(_bg, ssvs::getLocalCenter);
+            _bg.setPosition(320 / 2.f, 240 / 2.f);
+        }
+
+        void init_btr() { _btr.setAlign(ssvs::TextAlign::Center); }
+
+    public:
+        msgbox_screen(game_app& app) noexcept : base_type(app)
+        {
+            init_bg();
+            init_btr();
+        }
+
+        auto& btr() noexcept { return _btr; }
+
+        void update(ft dt) override
+        {
+            ssvs::setOrigin(_btr, ssvs::getLocalCenter);
+            _btr.setPosition(vec2f(320 / 2.f, 240 / 2.f));
+            _btr.update(dt);
+
+            if(_safety_time >= 0)
+            {
+                _safety_time -= dt;
+            }
+            else if(app().lb_down())
+            {
+                kill();
+                app().pop_screen();
+            }
+        }
+
+        void draw() override
+        {
+            app().render(_bg);
+            app().render(_btr);
+        }
+    };
+
     class battle_screen : public game_screen
     {
     public:
@@ -609,6 +676,8 @@ GGJ16_NAMESPACE
         ssvs::BitmapTextRich _t_cs{*assets().fontObBig};
         ssvs::BTR::PtrChunk _ptr_t_cs;
         ssvs::BTR::PtrWave _ptr_t_cs_wave;
+
+        ritual_effect_fn _success_effect;
 
         void init_cs_text()
         {
@@ -700,6 +769,7 @@ GGJ16_NAMESPACE
         {
             add_scripted_text(1.7f, rm.label());
 
+            _success_effect = rm.effect();
             _state = battle_screen_state::player_ritual;
             auto time_as_ft(ssvu::getSecondsToFT(rm.time()));
             _ritual_ctx.set_and_start_minigame(time_as_ft, rm.make());
@@ -749,6 +819,15 @@ GGJ16_NAMESPACE
                 });
         }
 
+        void display_msg_box(const std::string& s)
+        {
+            auto& mbs(app().make_screen<msgbox_screen>());
+            auto& btr(mbs.btr());
+
+            btr.eff<BTR::Tracking>(-3).eff(sfc::White).in(s);
+            app().push_screen(mbs);
+        }
+
         void fill_main_menu()
         {
             auto& m(*_m_main);
@@ -763,6 +842,17 @@ GGJ16_NAMESPACE
                 {
                     this->fill_item_menu();
                     bm.push_screen(*_m_item);
+                });
+            m.emplace_choice("Inspect enemy", [this](auto&)
+                {
+                    display_msg_box(
+                        "Inspecting "
+                        "enemy.."
+                        "aajsgois\ndajgiodsajgsadi\nogjdsaijgpadsjgpsadgoksda"
+                        "pgks"
+                        "da"
+                        "gopdsagksad\npgksadgsadkgsadpgksadp\ngkasdopgksdapgs"
+                        "d");
                 });
         }
 
@@ -788,7 +878,14 @@ GGJ16_NAMESPACE
             app()._shake = 40;
             add_scripted_text(1.2f, "Failure!");
         }
-        void ritual_success() { add_scripted_text(1.2f, "Success!"); }
+        void ritual_success()
+        {
+            add_scripted_text(1.2f, "Success!");
+
+            auto& b(_battle_context.battle());
+            _success_effect(
+                _battle_context.player_state(), b.player(), b.enemy());
+        }
 
         void update_menu(ft dt) { _menu_gfx_state.update(app(), _menu, dt); }
         void draw_menu() { _menu_gfx_state.draw(app().window()); }
@@ -943,6 +1040,9 @@ int main()
             sr.add_point({{30.f, 60.f}, 10.f});
             sr.add_point({{-50.f, -10.f}, 10.f});
             sr.add_point({{50.f, -10.f}, 10.f});
+        },
+        [](cplayer_state&, battle_participant&, battle_participant&)
+        {
         });
 
     ps.emplace_ritual<aura_ritual>("Rend armor", ritual_type::resist, 6,
@@ -951,6 +1051,9 @@ int main()
             sr.add_point({{-0.f, -45.f}, 20.f});
             sr.add_point({{-31.f, 31.f}, 20.f});
             sr.add_point({{31.f, 31.f}, 20.f});
+        },
+        [](cplayer_state&, battle_participant&, battle_participant&)
+        {
         });
 
     ps.emplace_ritual<drag_ritual>("Heal", ritual_type::complete, 5,
@@ -965,6 +1068,9 @@ int main()
                 auto y(ssvu::getRndR(offset, 240 - offset));
                 sr.add_draggable(vec2f{x, y});
             }
+        },
+        [](cplayer_state&, battle_participant&, battle_participant&)
+        {
         });
 
     battle_t b{b0, b1};
