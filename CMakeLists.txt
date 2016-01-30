@@ -15,7 +15,13 @@ vrm_cmake_find_extlib(SSVUtils)
 vrm_cmake_find_extlib(SSVStart)
 SSVCMake_findSFML()
 
-SSVCMake_setDefaults()
+set(INC_DIR "include" CACHE STRING "")
+set(SRC_DIR "src" CACHE STRING "")
+
+include_directories("./")
+include_directories("./${INC_DIR}")
+file(GLOB_RECURSE SRC_LIST "${INC_DIR}/*" "${SRC_DIR}/*")
+
 vrm_cmake_add_common_compiler_flags()
 
 # include_directories("./GGJ2015/")

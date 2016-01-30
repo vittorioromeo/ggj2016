@@ -4,6 +4,12 @@
 
 GGJ16_NAMESPACE
 {
+    namespace game_constants
+    {
+        constexpr sz_t width{1024};
+        constexpr sz_t height{768};
+    }
+
     class game_app;
 
     class game_screen
@@ -100,7 +106,8 @@ GGJ16_NAMESPACE
 
                         sf::RectangleShape block;
                         block.setPosition(vec2f(0, 0));
-                        block.setSize(vec2f(320, 240));
+                        block.setSize(vec2f(
+                            game_constants::width, game_constants::height));
                         block.setFillColor(sf::Color{0, 0, 0,
                             static_cast<sf::Uint8>(isc->opacity_block())});
 
@@ -194,6 +201,8 @@ GGJ16_NAMESPACE
         {
             init_loops();
         }
+
+        auto mp() const noexcept { return _camera.getMousePosition(); }
 
         auto lb_down() const noexcept
         {

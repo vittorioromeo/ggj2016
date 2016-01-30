@@ -27,7 +27,7 @@ GGJ16_NAMESPACE
                 _window.setFullscreen(false);
                 _window.setFPSLimited(true);
                 _window.setMaxFPS(200);
-                _window.setPixelMult(2);
+                _window.setPixelMult(1);
 
                 _app = std::make_unique<T>(_window);
                 _window.setGameState(_app->state());

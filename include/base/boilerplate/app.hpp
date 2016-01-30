@@ -32,12 +32,16 @@ GGJ16_NAMESPACE
                 _window.draw(FWD(xs)...);
             }
 
+
+
             inline auto& state() noexcept { return _state; }
             inline const auto& state() const noexcept { return _state; }
             inline auto& camera() noexcept { return _camera; }
             inline const auto& camera() const noexcept { return _camera; }
             inline auto& window() noexcept { return _window; }
             inline const auto& window() const noexcept { return _window; }
+
+
         };
     }
 }

@@ -104,14 +104,15 @@ GGJ16_NAMESPACE
         using base_type = impl::ritual_minigame_base;
 
         int next_id{1};
-        vec2f _center{320 / 2.f, 240 / 2.f};
+        vec2f _center{
+            game_constants::width / 2.f, game_constants::height / 2.f};
         std::vector<sf::CircleShape> _pshapes;
         std::vector<ssvs::BitmapText> _ptexts;
         std::vector<int> _phits;
 
         auto is_shape_hovered(const sf::CircleShape& cs) noexcept
         {
-            auto mp(app().window().getMousePosition());
+            auto mp(app().mp());
             return ssvs::getDistEuclidean(mp, cs.getPosition()) <
                    cs.getRadius();
         }
@@ -207,12 +208,13 @@ GGJ16_NAMESPACE
     private:
         using base_type = impl::ritual_minigame_base;
 
-        vec2f _center{320 / 2.f, 240 / 2.f};
+        vec2f _center{
+            game_constants::width / 2.f, game_constants::height / 2.f};
         std::vector<sf::CircleShape> _pshapes;
 
         auto is_shape_hovered(const sf::CircleShape& cs) noexcept
         {
-            auto mp(app().window().getMousePosition());
+            auto mp(app().mp());
             return ssvs::getDistEuclidean(mp, cs.getPosition()) <
                    cs.getRadius();
         }
@@ -285,7 +287,8 @@ GGJ16_NAMESPACE
     private:
         using base_type = impl::ritual_minigame_base;
 
-        vec2f _center{320 / 2.f, 240 / 2.f};
+        vec2f _center{
+            game_constants::width / 2.f, game_constants::height / 2.f};
 
         std::vector<sf::RectangleShape> _ptargets;
         std::vector<int> _phits;
@@ -295,7 +298,7 @@ GGJ16_NAMESPACE
 
         auto is_shape_hovered(const sf::RectangleShape& cs) noexcept
         {
-            auto mp(app().window().getMousePosition());
+            auto mp(app().mp());
 
             if(mp.x < ssvs::getGlobalLeft(cs)) return false;
             if(mp.x > ssvs::getGlobalRight(cs)) return false;
@@ -308,7 +311,7 @@ GGJ16_NAMESPACE
 
         auto is_shape_hovered(const sf::CircleShape& cs) noexcept
         {
-            auto mp(app().window().getMousePosition());
+            auto mp(app().mp());
             return ssvs::getDistEuclidean(mp, cs.getPosition()) <
                    cs.getRadius();
         }
@@ -365,7 +368,8 @@ GGJ16_NAMESPACE
                 success();
             }
 
-            if(_curr != 1 && _phits[_curr] == 1)
+
+            if(_curr != -1 && _phits[_curr] == 1)
             {
                 _curr = -1;
             }
@@ -383,8 +387,8 @@ GGJ16_NAMESPACE
 
                 if(_curr == i && _phits[i] == 0)
                 {
-                    auto mp(app().window().getMousePosition());
-                    s.setPosition(mp);
+                    auto mp(app().mp());
+                    s.setPosition(vec2f(mp));
                 }
 
                 for(auto& t : _ptargets)
@@ -508,6 +512,8 @@ GGJ16_NAMESPACE
                 .eff(sfc::Red)
                 .in(_ptr_time_text)
                 .mk("");
+
+            _tr.setScale(vec2f(3.f, 3.f));
         }
 
     public:
@@ -559,7 +565,7 @@ GGJ16_NAMESPACE
 
             ssvs::setOrigin(_tr, ssvs::getLocalCenterE);
             _tr.setAlign(ssvs::TextAlign::Right);
-            _tr.setPosition(vec2f(320 - 20, 20));
+            _tr.setPosition(vec2f(game_constants::width - 20, 20));
             _app.render(_tr);
         }
     };
@@ -595,15 +601,20 @@ GGJ16_NAMESPACE
 
         void init_bg()
         {
-            _bg.setSize(vec2f(220, 120));
+            _bg.setSize(vec2f(220 * 3, 120 * 3));
             _bg.setFillColor(sfc::Black);
             _bg.setOutlineColor(sfc::White);
             _bg.setOutlineThickness(3);
             ssvs::setOrigin(_bg, ssvs::getLocalCenter);
-            _bg.setPosition(320 / 2.f, 240 / 2.f);
+            _bg.setPosition(
+                game_constants::width / 2.f, game_constants::height / 2.f);
         }
 
-        void init_btr() { _btr.setAlign(ssvs::TextAlign::Center); }
+        void init_btr()
+        {
+            _btr.setAlign(ssvs::TextAlign::Center);
+            _btr.setScale(vec2f(3.f, 3.f));
+        }
 
     public:
         msgbox_screen(game_app& app) noexcept : base_type(app)
@@ -617,7 +628,8 @@ GGJ16_NAMESPACE
         void update(ft dt) override
         {
             ssvs::setOrigin(_btr, ssvs::getLocalCenter);
-            _btr.setPosition(vec2f(320 / 2.f, 240 / 2.f));
+            _btr.setPosition(vec2f(
+                game_constants::width / 2.f, game_constants::height / 2.f));
             _btr.update(dt);
 
             if(_safety_time >= 0)
@@ -641,6 +653,16 @@ GGJ16_NAMESPACE
     class battle_screen : public game_screen
     {
     public:
+        ssvs::Camera _hud_camera;
+        ssvs::Camera _real_camera;
+        /*
+                auto mp_hud() const noexcept { return
+           _hud_camera.getMousePosition(); }
+                auto mp_real() const noexcept
+                {
+                    return _real_camera.getMousePosition();
+                }*/
+
     private:
         struct scripted_event
         {
@@ -679,6 +701,23 @@ GGJ16_NAMESPACE
 
         ritual_effect_fn _success_effect;
 
+        sf::RectangleShape _stats_bg;
+        sf::RectangleShape _menu_bg;
+
+        void init_menu_bg()
+        {
+            auto sw(350.f);
+            auto h(200.f);
+
+            _stats_bg.setSize(vec2f{sw, h});
+            _stats_bg.setFillColor(sf::Color{75, 35, 35, 255});
+            _stats_bg.setPosition(vec2f{0, game_constants::height - h});
+
+            _menu_bg.setSize(vec2f{game_constants::width - sw, h});
+            _menu_bg.setFillColor(sf::Color{35, 35, 35, 255});
+            _menu_bg.setPosition(vec2f{sw, game_constants::height - h});
+        }
+
         void init_cs_text()
         {
             _scripted_events.reserve(10);
@@ -689,6 +728,8 @@ GGJ16_NAMESPACE
                 .eff(_ptr_t_cs_wave)
                 .in(_ptr_t_cs)
                 .mk("");
+
+            _t_cs.setScale(vec2f{3.f, 3.f});
 
             VRM_CORE_ASSERT(_ptr_t_cs_wave != nullptr);
             VRM_CORE_ASSERT(_ptr_t_cs != nullptr);
@@ -712,7 +753,8 @@ GGJ16_NAMESPACE
                 {
                     ssvs::setOrigin(_t_cs, ssvs::getLocalCenter);
                     _t_cs.setAlign(ssvs::TextAlign::Center);
-                    _t_cs.setPosition(320 / 2.f, 240 / 2.f);
+                    _t_cs.setPosition(game_constants::width / 2.f,
+                        game_constants::height / 2.f);
 
                     VRM_CORE_ASSERT(_ptr_t_cs_wave != nullptr);
                     if(t >=
@@ -844,7 +886,7 @@ GGJ16_NAMESPACE
                 });
             m.emplace_choice("Inspect enemy", [this](auto&)
                 {
-                    display_msg_box(
+                    this->display_msg_box(
                         "Inspecting "
                         "enemy.."
                         "aajsgois\ndajgiodsajgsadi\nogjdsaijgpadsjgpsadgoksda"
@@ -884,8 +926,15 @@ GGJ16_NAMESPACE
             _success_effect(_battle_context);
         }
 
+
+
         void update_menu(ft dt) { _menu_gfx_state.update(app(), _menu, dt); }
-        void draw_menu() { _menu_gfx_state.draw(app().window()); }
+        void draw_menu()
+        {
+            app().render(_stats_bg);
+            app().render(_menu_bg);
+            _menu_gfx_state.draw(app().window());
+        }
 
         void update_ritual(ft dt)
         {
@@ -1081,7 +1130,7 @@ GGJ16_NAMESPACE
             auto& battle(_battle_context.battle());
             _battle_context.on_event += [this](auto e)
             {
-                event_listener(e);
+                this->event_listener(e);
             };
 
             // Assume player starts
@@ -1097,9 +1146,12 @@ GGJ16_NAMESPACE
     public:
         battle_screen(game_app& app, battle_context_t& battle_context) noexcept
             : base_type(app),
+              _hud_camera{app.window(), 2.f},
+              _real_camera{app.window()},
               _battle_context{battle_context},
               _ritual_ctx{app}
         {
+            init_menu_bg();
             init_cs_text();
             init_menu();
             init_battle();
@@ -1109,6 +1161,8 @@ GGJ16_NAMESPACE
 
         void update(ft dt) override
         {
+            // ssvu::lo() << app().mp() << "\n";
+
             if(!_scripted_events.empty())
             {
                 update_scripted_events(dt);
@@ -1153,11 +1207,15 @@ GGJ16_NAMESPACE
 
             if(_state == battle_screen_state::player_menu)
             {
+                //  _hud_camera.apply();
                 draw_menu();
+                //  _hud_camera.unapply();
             }
             else if(_state == battle_screen_state::player_ritual)
             {
+                //  _hud_camera.apply();
                 draw_ritual();
+                //  _hud_camera.unapply();
             }
             else if(_state == battle_screen_state::enemy_turn)
             {
@@ -1173,7 +1231,8 @@ int main()
     using namespace ggj16;
 
     using game_app_runner = boilerplate::app_runner<game_app>;
-    game_app_runner game{"ggj2016 temp", 320, 240};
+    game_app_runner game{
+        "ggj2016 temp", game_constants::width, game_constants::height};
     game_app& app(game.app());
 
     character_stats cs0;
@@ -1223,13 +1282,14 @@ int main()
     ps.emplace_ritual<drag_ritual>("Heal", ritual_type::complete, 5,
         [](drag_ritual& sr)
         {
-            sr.add_target({320.f / 2, 240.f / 2});
+            sr.add_target(
+                {game_constants::width / 2.f, game_constants::height / 2.f});
 
             for(int i = 0; i < 6; ++i)
             {
                 auto offset(20.f);
-                auto x(ssvu::getRndR(offset, 320 - offset));
-                auto y(ssvu::getRndR(offset, 240 - offset));
+                auto x(ssvu::getRndR(offset, game_constants::width - offset));
+                auto y(ssvu::getRndR(offset, game_constants::height - offset));
                 sr.add_draggable(vec2f{x, y});
             }
         },

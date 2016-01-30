@@ -121,7 +121,7 @@ GGJ16_NAMESPACE
 
         auto is_hovered(game_app& app)
         {
-            auto mp(app.window().getMousePosition());
+            auto mp(app.mp());
 
             auto l(ssvs::getGlobalLeft(_shape));
             auto r(ssvs::getGlobalRight(_shape));
@@ -132,18 +132,20 @@ GGJ16_NAMESPACE
             return false;
         }
 
+
     public:
+        static constexpr float btn_w{120.f * 2.f};
+        static constexpr float btn_h{20.f * 2.f};
         battle_menu_gfx_button(const vec2f& pos, const battle_menu_choice& bmc)
             : _pos(pos), _bmc(bmc)
         {
-            _tr.setAlign(ssvs::TextAlign::Left);
+            _tr.setAlign(ssvs::TextAlign::Center);
             _tr.eff<BTR::Tracking>(-3).in(_bmc.label()).mk("");
+            _tr.setScale(vec2f(3.f, 3.f));
 
-            vec2f shape_sz(130, 20);
+            vec2f shape_sz(btn_w, btn_h);
             _shape.setSize(shape_sz);
-            _shape.setOrigin(shape_sz / 2.f);
-
-            _tr.setOrigin(shape_sz / 2.f);
+            // _shape.setOrigin(shape_sz / 2.f);
         }
 
         void update(game_app& app, battle_menu& bm, ft dt)
@@ -151,7 +153,7 @@ GGJ16_NAMESPACE
             _shape.setPosition(_pos);
             _shape.setFillColor(is_hovered(app) ? sfc::Green : sfc::Red);
 
-            auto lbtn_down(app.window().getInputState()[ssvs::MBtn::Left]);
+            auto lbtn_down(app.lb_down());
 
             if(is_hovered(app) && !bm._was_pressed && lbtn_down)
             {
@@ -166,6 +168,8 @@ GGJ16_NAMESPACE
 
             _tr.setPosition(_pos + vec2f(5.f, 5.f));
 
+            ssvs::setOrigin(_tr, ssvs::getLocalCenter);
+            _tr.setPosition(ssvs::getGlobalCenter(_shape));
             _tr.update(dt);
         }
 
@@ -185,27 +189,53 @@ GGJ16_NAMESPACE
         {
             _buttons.clear();
 
-            vec2f start_pos(100, 60);
+            auto menu_h(200);
+            auto menu_start_x(350.f);
+            auto menu_start_y(game_constants::height - menu_h);
+            auto menu_end_y(
+                game_constants::width - battle_menu_gfx_button::btn_w);
+            auto menu_end_x(game_constants::height);
+            auto offset(60.f);
+
+            std::array<vec2f, 4> poss{
+                vec2f{menu_start_x + offset, menu_start_y + offset}, // .
+                vec2f{menu_end_x - offset, menu_start_y + offset},   // .
+                vec2f{menu_start_x + offset, menu_end_y - offset},   // .
+                vec2f{menu_end_x - offset, menu_end_y - offset},     // .
+            };
+
             int i = 0;
-            bs.for_choices([this, &i, &start_pos](const auto& c)
+            bs.for_choices([this, &i, &poss](const auto& cc)
                 {
-                    auto pos(start_pos + vec2f(0, 40 * i));
-                    _buttons.emplace_back(pos, c);
+                    _buttons.emplace_back(poss[i], cc);
                     ++i;
                 });
         }
+
+        std::function<void()> _reb_fn;
+        bool _must_reb{false};
 
     public:
         battle_menu_gfx_state() { _buttons.reserve(10); }
 
         void rebuild_from(const battle_menu& bm)
         {
-            rebuild_from(bm.current_screen());
+            _reb_fn = [this, &bm]
+            {
+                rebuild_from(bm.current_screen());
+            };
+            _must_reb = true;
         }
 
         void update(game_app& app, battle_menu& bm, ft dt)
         {
             for(auto& b : _buttons) b.update(app, bm, dt);
+
+            if(_must_reb)
+            {
+                _must_reb = false;
+                _reb_fn();
+            }
         }
 
         void draw(sf::RenderTarget& rt)
