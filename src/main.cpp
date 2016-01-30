@@ -392,6 +392,10 @@ GGJ16_NAMESPACE
                     {
                         s.setRadius(0.f);
                         _phits[i] = 1;
+                        if(_curr == i)
+                        {
+                            _curr = -1;
+                        }
                     }
                 }
             }
@@ -616,6 +620,9 @@ GGJ16_NAMESPACE
                 .eff(_ptr_t_cs_wave)
                 .in(_ptr_t_cs)
                 .mk("");
+
+            VRM_CORE_ASSERT(_ptr_t_cs_wave != nullptr);
+            VRM_CORE_ASSERT(_ptr_t_cs != nullptr);
         }
 
         template <typename TFU, typename TFD>
@@ -638,6 +645,7 @@ GGJ16_NAMESPACE
                     _t_cs.setAlign(ssvs::TextAlign::Center);
                     _t_cs.setPosition(320 / 2.f, 240 / 2.f);
 
+                    VRM_CORE_ASSERT(_ptr_t_cs_wave != nullptr);
                     if(t >=
                         ssvu::getSecondsToFT(time) - ssvu::getSecondsToFT(1.f))
                     {
@@ -649,6 +657,8 @@ GGJ16_NAMESPACE
                         _ptr_t_cs_wave->amplitude = 0;
                     }
 
+
+                    VRM_CORE_ASSERT(_ptr_t_cs != nullptr);
                     _ptr_t_cs->setStr(s);
                     _t_cs.update(dt);
                 },
