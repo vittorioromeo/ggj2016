@@ -258,6 +258,8 @@ GGJ16_NAMESPACE
                 failure();
             }
 
+            bool mps{false};
+
             for(sz_t i = 0; i < _pshapes.size(); ++i)
             {
                 auto& s(_pshapes[i]);
@@ -267,8 +269,7 @@ GGJ16_NAMESPACE
 
                 if(is_shape_hovered(s))
                 {
-                    assets().psnd(assets().bip);
-
+                    mps = true;
                     s.setFillColor(sfc::Green);
                     s.setRadius(
                         std::min(75.f, std::abs(s.getRadius() + dt * 2.78f)));
@@ -279,6 +280,11 @@ GGJ16_NAMESPACE
                     s.setRadius(
                         std::max(0.f, std::abs(s.getRadius() - (dt * 0.74f))));
                 }
+            }
+
+            if(mps)
+            {
+                assets().psnd(assets().bip);
             }
         }
         void draw() override
@@ -833,6 +839,9 @@ GGJ16_NAMESPACE
         sf::Sprite _landscape{*assets().landscape};
         sf::Sprite _enemy;
 
+        float _enemy_f{0};
+        float _enemy_f_magnitude{30.f};
+
         float _enemy_shake{0};
 
         using base_type = game_screen;
@@ -889,7 +898,7 @@ GGJ16_NAMESPACE
             _enemy_stats_gfx.hide_mana();
 
             _enemy.setTexture(*curr_bctx().enemy_state()._enemy_texture);
-            _enemy.setScale(vec2f(0.4f, 0.4f));
+            _enemy.setScale(vec2f(0.5f, 0.5f));
             ssvs::setOrigin(_enemy, ssvs::getLocalCenter);
             _esprite_pos = vec2f(game_constants::width / 2.f,
                 game_constants::height / 2.f - 75.f);
@@ -1392,6 +1401,7 @@ GGJ16_NAMESPACE
         void update(ft dt) override
         {
             update_stat_bars();
+            auto f_off(vec2f{0, std::sin(_enemy_f) * _enemy_f_magnitude});
 
             if(_enemy_shake > 0)
             {
@@ -1399,14 +1409,15 @@ GGJ16_NAMESPACE
                 auto s(std::abs(_enemy_shake));
                 vec2f offset(
                     ssvu::getRndR(-s, s + 0.1f), ssvu::getRndR(-s, s + 0.1f));
-                _enemy.setPosition(_esprite_pos + offset);
+                _enemy.setPosition(_esprite_pos + f_off + offset);
 
                 return;
             }
             else
             {
+                _enemy_f += dt * 0.06f;
                 _enemy_shake = 0;
-                _enemy.setPosition(_esprite_pos);
+                _enemy.setPosition(_esprite_pos + f_off);
             }
 
             if(!_scripted_events.empty())
@@ -1466,6 +1477,8 @@ GGJ16_NAMESPACE
             else if(_state == battle_screen_state::to_next_ctx)
             {
                 ++_ctx_idx;
+                _enemy.setTexture(*curr_bctx().enemy_state()._enemy_texture);
+
                 if(_ctx_idx < 4)
                 {
                     display_msg_box("The next demon approaches...");
@@ -1565,7 +1578,7 @@ GGJ16_NAMESPACE
             _t_cs.eff<BTR::Tracking>(-3)
                 .eff(sfc::Red)
                 .eff<BTR::Wave>(1.5f, 0.03f)
-                .in("aborti morti");
+                .in("Demon Cleansing");
 
             _t_cs2.eff<BTR::Tracking>(-3)
                 .eff(sfc::White)
@@ -1717,7 +1730,8 @@ void fill_ps(ggj16::cplayer_state& ps)
         });
 
     ps.emplace_utl_ritual<drag_ritual>("Repair shield",
-        "Medium ritual.\nCollect the dots.\nMinimal HP self-damage.\nMedium "
+        "Medium ritual.\nCollect the dots.\nMinimal HP "
+        "self-damage.\nMedium "
         "shield restoration.",
         ritual_type::complete, 6, 40,
         [](drag_ritual& sr)
@@ -1746,7 +1760,8 @@ void fill_ps(ggj16::cplayer_state& ps)
         {
             auto offset(30.f);
             //  vec2f center(
-            //       game_constants::width / 2.f, game_constants::height / 2.f);
+            //       game_constants::width / 2.f, game_constants::height /
+            //       2.f);
 
             for(int i = -3; i < 4; ++i)
             {
@@ -1905,8 +1920,8 @@ int main()
     game_app& app(game.app());
 
     character_stats cs_demon0;
-    cs_demon0.health() = cs_demon0.maxhealth() = 75;
-    cs_demon0.shield() = cs_demon0.maxshield() = 35;
+    cs_demon0.health() = cs_demon0.maxhealth() = 50;
+    cs_demon0.shield() = cs_demon0.maxshield() = 30;
     cs_demon0.mana() = cs_demon0.maxmana() = 100;
     cs_demon0.power() = 10;
     battle_participant demon0{cs_demon0};
@@ -1914,8 +1929,8 @@ int main()
     es_d0._f_ai = first_ai();
 
     character_stats cs_demon1;
-    cs_demon1.health() = cs_demon1.maxhealth() = 100;
-    cs_demon1.shield() = cs_demon1.maxshield() = 45;
+    cs_demon1.health() = cs_demon1.maxhealth() = 60;
+    cs_demon1.shield() = cs_demon1.maxshield() = 35;
     cs_demon1.mana() = cs_demon1.maxmana() = 200;
     cs_demon1.power() = 20;
     battle_participant demon1{cs_demon1};
@@ -1923,8 +1938,8 @@ int main()
     es_d1._f_ai = second_ai();
 
     character_stats cs_demon2;
-    cs_demon2.health() = cs_demon2.maxhealth() = 120;
-    cs_demon2.shield() = cs_demon2.maxshield() = 60;
+    cs_demon2.health() = cs_demon2.maxhealth() = 70;
+    cs_demon2.shield() = cs_demon2.maxshield() = 50;
     cs_demon2.mana() = cs_demon2.maxmana() = 300;
     cs_demon2.power() = 30;
     battle_participant demon2{cs_demon2};
@@ -1932,8 +1947,8 @@ int main()
     es_d2._f_ai = third_ai();
 
     character_stats cs_demon3;
-    cs_demon3.health() = cs_demon3.maxhealth() = 160;
-    cs_demon3.shield() = cs_demon3.maxshield() = 80;
+    cs_demon3.health() = cs_demon3.maxhealth() = 100;
+    cs_demon3.shield() = cs_demon3.maxshield() = 60;
     cs_demon3.mana() = cs_demon3.maxmana() = 400;
     cs_demon3.power() = 40;
     battle_participant demon3{cs_demon3};
@@ -1943,7 +1958,7 @@ int main()
 
     character_stats cs_player;
     cs_player.health() = cs_player.maxhealth() = 100;
-    cs_player.shield() = cs_player.maxshield() = 40;
+    cs_player.shield() = cs_player.maxshield() = 50;
     cs_player.mana() = cs_player.maxmana() = 100;
     cs_player.power() = 100;
     battle_participant bplayer{cs_player};

@@ -59,6 +59,7 @@ GGJ16_NAMESPACE
                 */
 
                 _sound_player.setVolume(100.f);
+                _music_player.setVolume(100.f);
             }
 
             template <typename T>
