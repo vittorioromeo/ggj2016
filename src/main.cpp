@@ -20,7 +20,8 @@ GGJ16_NAMESPACE
         before_enemy_turn,
         before_player_turn,
         to_next_ctx,
-        to_game_over
+        to_game_over,
+        game_over
     };
 
     enum class ritual_minigame_state
@@ -859,7 +860,7 @@ GGJ16_NAMESPACE
         battle_menu_screen* _m_ritual_utl;
 
 
-        std::vector<battle_context_t*> _ctxs;
+        std::vector<std::unique_ptr<battle_context_t>> _ctxs;
         sz_t _ctx_idx{0};
 
         auto& curr_bctx() { return *(_ctxs[_ctx_idx]); }
@@ -876,6 +877,12 @@ GGJ16_NAMESPACE
 
         ritual_effect_fn _success_effect;
 
+
+        void reset()
+        {
+            _state = battle_screen_state::player_menu;
+            _ctx_idx = 0;
+        }
 
         stats_gfx _player_stats_gfx;
         stats_gfx _enemy_stats_gfx;
@@ -1382,9 +1389,10 @@ GGJ16_NAMESPACE
 
     public:
         battle_screen(game_app& app,
-            std::vector<battle_context_t*> ctxs) noexcept : base_type(app),
-                                                            _ctxs(ctxs),
-                                                            _ritual_ctx{app}
+            std::vector<std::unique_ptr<battle_context_t>>&& ctxs) noexcept
+            : base_type(app),
+              _ctxs(std::move(ctxs)),
+              _ritual_ctx{app}
         {
             init_menu_bg();
             init_cs_text();
@@ -1462,7 +1470,8 @@ GGJ16_NAMESPACE
             else if(_state == battle_screen_state::before_player_turn)
             {
 
-                if(curr_bctx().player().stats().health() <= 0)
+                if(curr_bctx().player().stats().health() <= 0 &&
+                    _state != battle_screen_state::to_game_over)
                 {
                     game_over();
                 }
@@ -1492,7 +1501,11 @@ GGJ16_NAMESPACE
             }
             else if(_state == battle_screen_state::to_game_over)
             {
+                _state = battle_screen_state::game_over;
                 display_msg_box("Game over!");
+            }
+            else if(_state == battle_screen_state::game_over)
+            {
                 app().pop_screen();
             }
         }
@@ -1930,68 +1943,90 @@ int main()
     cs_demon0.shield() = cs_demon0.maxshield() = 30;
     cs_demon0.mana() = cs_demon0.maxmana() = 100;
     cs_demon0.power() = 10;
-    battle_participant demon0{cs_demon0};
-    cenemy_state es_d0{assets().d0};
-    es_d0._f_ai = first_ai();
 
     character_stats cs_demon1;
     cs_demon1.health() = cs_demon1.maxhealth() = 60;
     cs_demon1.shield() = cs_demon1.maxshield() = 35;
     cs_demon1.mana() = cs_demon1.maxmana() = 200;
     cs_demon1.power() = 20;
-    battle_participant demon1{cs_demon1};
-    cenemy_state es_d1{assets().d1};
-    es_d1._f_ai = second_ai();
 
     character_stats cs_demon2;
     cs_demon2.health() = cs_demon2.maxhealth() = 70;
     cs_demon2.shield() = cs_demon2.maxshield() = 50;
     cs_demon2.mana() = cs_demon2.maxmana() = 300;
     cs_demon2.power() = 30;
-    battle_participant demon2{cs_demon2};
-    cenemy_state es_d2{assets().d2};
-    es_d2._f_ai = third_ai();
 
     character_stats cs_demon3;
     cs_demon3.health() = cs_demon3.maxhealth() = 100;
     cs_demon3.shield() = cs_demon3.maxshield() = 60;
     cs_demon3.mana() = cs_demon3.maxmana() = 400;
     cs_demon3.power() = 40;
-    battle_participant demon3{cs_demon3};
-    cenemy_state es_d3{assets().d3};
-    es_d3._f_ai = fourth_ai();
-
 
     character_stats cs_player;
     cs_player.health() = cs_player.maxhealth() = 100;
     cs_player.shield() = cs_player.maxshield() = 50;
     cs_player.mana() = cs_player.maxmana() = 100;
     cs_player.power() = 100;
+
+    battle_participant demon0{cs_demon0};
+    cenemy_state es_d0{assets().d0};
+    es_d0._f_ai = first_ai();
+
+
+    battle_participant demon1{cs_demon1};
+    cenemy_state es_d1{assets().d1};
+    es_d1._f_ai = second_ai();
+
+
+    battle_participant demon2{cs_demon2};
+    cenemy_state es_d2{assets().d2};
+    es_d2._f_ai = third_ai();
+
+
+    battle_participant demon3{cs_demon3};
+    cenemy_state es_d3{assets().d3};
+    es_d3._f_ai = fourth_ai();
+
     battle_participant bplayer{cs_player};
     cplayer_state ps;
     fill_ps(ps);
 
     battle_t b0{bplayer, demon0};
-    battle_context_t bc0{ps, es_d0, b0};
-
     battle_t b1{bplayer, demon1};
-    battle_context_t bc1{ps, es_d1, b1};
-
     battle_t b2{bplayer, demon2};
-    battle_context_t bc2{ps, es_d2, b2};
-
     battle_t b3{bplayer, demon3};
-    battle_context_t bc3{ps, es_d3, b3};
 
-    auto& s_title(app.make_screen<title_screen>());
-    auto& s_battle(app.make_screen<battle_screen>(
-        std::vector<battle_context_t*>{&bc0, &bc1, &bc2, &bc3}));
-
-    s_title.on_start = [&]
+    auto battle_set = [=, &app, &ps]() mutable
     {
+        auto bc0(std::make_unique<battle_context_t>(ps, es_d0, b0));
+        auto bc1(std::make_unique<battle_context_t>(ps, es_d1, b1));
+        auto bc2(std::make_unique<battle_context_t>(ps, es_d2, b2));
+        auto bc3(std::make_unique<battle_context_t>(ps, es_d3, b3));
+
+        std::vector<std::unique_ptr<battle_context_t>> bcs;
+        bcs.emplace_back(std::move(bc0));
+        bcs.emplace_back(std::move(bc1));
+        bcs.emplace_back(std::move(bc2));
+        bcs.emplace_back(std::move(bc3));
+
+        auto& s_battle(app.make_screen<battle_screen>(std::move(bcs)));
+
+        s_battle.reset();
         app.push_screen(s_battle);
     };
 
+    /*
+    battle_context_t bc0{ps, es_d0, b0};
+    battle_context_t bc1{ps, es_d1, b1};
+    battle_context_t bc2{ps, es_d2, b2};
+    battle_context_t bc3{ps, es_d3, b3};
+    */
+
+    auto& s_title(app.make_screen<title_screen>());
+    s_title.on_start = [battle_set]() mutable
+    {
+        battle_set();
+    };
     app.push_screen(s_title);
 
     game.run();
