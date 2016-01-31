@@ -180,7 +180,7 @@ GGJ16_NAMESPACE
                 game_constants::height - battle_menu_gfx_button::btn_h);
             auto menu_end_x(
                 game_constants::width - battle_menu_gfx_button::btn_w);
-            auto offset(30.f);
+            auto offset(45.f);
 
             std::array<vec2f, 4> poss{
                 vec2f{menu_start_x + offset, menu_start_y + offset}, // .

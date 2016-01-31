@@ -4,6 +4,7 @@
         "fontObStroked.png",
         "fontObBig.png",
         "landscape.png",
+        "bar.png",
         "d0.png",
 "d1.png",
 "d2.png",
@@ -19,7 +20,8 @@
 "obliterate.ogg",
 "success.ogg",
 "blip.ogg",
-"scripted_text.ogg"
+"scripted_text.ogg",
+"music.ogg"
     ],
     "musics":
     [

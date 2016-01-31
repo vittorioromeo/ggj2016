@@ -161,11 +161,22 @@ GGJ16_NAMESPACE
 
     private:
         using this_type = game_app;
+        sf::Sound music;
 
         impl::game_screen_manager _screen_manager;
 
+    public:
+        void setup_music(sf::SoundBuffer* b)
+        {
+            music.setBuffer(*b);
+            music.setLoop(true);
+            music.play();
+        }
+
+    private:
         void init_loops()
         {
+
             auto orig_camera_pos = _camera.getCenter();
             state().onUpdate += [this, orig_camera_pos](ft dt)
             {

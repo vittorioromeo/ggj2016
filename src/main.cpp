@@ -754,12 +754,12 @@ GGJ16_NAMESPACE
     public:
         stat_bar(sf::Color bar_color)
         {
-            _bar.setOutlineColor(sfc::White);
-            _bar.setOutlineThickness(2);
+            _bar.setOutlineColor(sfc::Black);
+            _bar.setOutlineThickness(3);
             _bar.setFillColor(bar_color);
 
-            _bar_outl.setOutlineColor(sfc::White);
-            _bar_outl.setOutlineThickness(2);
+            _bar_outl.setOutlineColor(sfc::Black);
+            _bar_outl.setOutlineThickness(3);
             _bar_outl.setFillColor(sfc::Transparent);
 
             _txt.setScale(vec2f(3.f, 3.f));
@@ -788,15 +788,15 @@ GGJ16_NAMESPACE
 
     struct stats_gfx : public sf::Transformable, public sf::Drawable
     {
-        stat_bar _health_b{sfc::Red};
-        stat_bar _shield_b{sfc::Yellow};
-        stat_bar _mana_b{sfc::Blue};
+        stat_bar _health_b{sf::Color{255, 0, 0, 200}};
+        stat_bar _shield_b{sf::Color{255, 255, 0, 200}};
+        stat_bar _mana_b{sf::Color{0, 0, 255, 200}};
         bool _mana_visibile{true};
 
         stats_gfx()
         {
-            _shield_b.setPosition(0, 60.f);
-            _mana_b.setPosition(0, 120.f);
+            _shield_b.setPosition(0, 120.f);
+            _mana_b.setPosition(0, 60.f);
         }
 
         virtual void draw(
@@ -815,7 +815,11 @@ GGJ16_NAMESPACE
             _mana_b.refresh(cs.mana(), cs.maxmana());
         }
 
-        void hide_mana() { _mana_visibile = false; }
+        void hide_mana()
+        {
+            _mana_visibile = false;
+            _shield_b.setPosition(0, 60.f);
+        }
     };
 
 
@@ -838,6 +842,7 @@ GGJ16_NAMESPACE
 
         sf::Sprite _landscape{*assets().landscape};
         sf::Sprite _enemy;
+        sf::Sprite _bar{*assets().bar};
 
         float _enemy_f{0};
         float _enemy_f_magnitude{30.f};
@@ -871,8 +876,6 @@ GGJ16_NAMESPACE
 
         ritual_effect_fn _success_effect;
 
-        sf::RectangleShape _stats_bg;
-        sf::RectangleShape _menu_bg;
 
         stats_gfx _player_stats_gfx;
         stats_gfx _enemy_stats_gfx;
@@ -884,16 +887,10 @@ GGJ16_NAMESPACE
             auto sw(350.f);
             auto h(200.f);
 
-            _stats_bg.setSize(vec2f{sw, h});
-            _stats_bg.setFillColor(sf::Color{75, 35, 35, 255});
-            _stats_bg.setPosition(vec2f{0, game_constants::height - h});
-
-            _menu_bg.setSize(vec2f{game_constants::width - sw, h});
-            _menu_bg.setFillColor(sf::Color{35, 35, 35, 255});
-            _menu_bg.setPosition(vec2f{sw, game_constants::height - h});
+            _bar.setPosition(vec2f{0, game_constants::height - h});
 
             _player_stats_gfx.setPosition(
-                vec2f{20.f, game_constants::height - h + 20.f});
+                vec2f{85.f, game_constants::height - h + 20.f});
             _enemy_stats_gfx.setPosition(vec2f{20.f, 20.f});
             _enemy_stats_gfx.hide_mana();
 
@@ -1153,13 +1150,12 @@ GGJ16_NAMESPACE
         void update_menu(ft dt) { _menu_gfx_state.update(app(), _menu, dt); }
         void draw_menu()
         {
-            app().render(_menu_bg);
+            app().render(_bar);
             _menu_gfx_state.draw(app().window());
         }
 
         void draw_stats_bars()
         {
-            app().render(_stats_bg);
             app().render(_player_stats_gfx);
             app().render(_enemy_stats_gfx);
         }
@@ -1396,6 +1392,8 @@ GGJ16_NAMESPACE
             init_battle();
 
             add_scripted_text(1.7f, "Battle start!");
+
+            app.setup_music(assets().music);
         }
 
         void update(ft dt) override
@@ -1477,7 +1475,10 @@ GGJ16_NAMESPACE
             else if(_state == battle_screen_state::to_next_ctx)
             {
                 ++_ctx_idx;
-                _enemy.setTexture(*curr_bctx().enemy_state()._enemy_texture);
+                //_enemy.setTexture(*curr_bctx().enemy_state()._enemy_texture);
+                _enemy = sf::Sprite{*curr_bctx().enemy_state()._enemy_texture};
+                _enemy.setScale(vec2f(0.5f, 0.5f));
+                ssvs::setOrigin(_enemy, ssvs::getLocalCenter);
 
                 if(_ctx_idx < 4)
                 {
@@ -1530,7 +1531,12 @@ GGJ16_NAMESPACE
     void battle_menu_gfx_button::update(game_app & app, battle_menu & bm, ft dt)
     {
         _shape.setPosition(_pos);
-        _shape.setFillColor(is_hovered(app) ? sfc::Green : sfc::Red);
+        sf::Color cuh{0, 0, 0, 230};
+        sf::Color ch{0, 0, 0, 130};
+
+        _shape.setOutlineColor(sfc::Black);
+        _shape.setOutlineThickness(3);
+        _shape.setFillColor(is_hovered(app) ? ch : cuh);
 
         auto lbtn_down(app.lb_down());
         auto rbtn_down(app.rb_down());

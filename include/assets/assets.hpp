@@ -30,12 +30,12 @@ GGJ16_NAMESPACE
             CACHE_ASSETS(ssvs::BitmapFont, "", fontObStroked, fontObBig)
 
             // Textures
-            CACHE_ASSETS(sf::Texture, ".png", landscape, d0, d1, d2, d3)
+            CACHE_ASSETS(sf::Texture, ".png", landscape, d0, d1, d2, d3,bar)
 
             // Sounds
             CACHE_ASSETS(sf::SoundBuffer, ".ogg", click0, enemy_atk0,
                 enemy_atk1, msgbox, shield_up, fireball, obliterate, success,
-                failure, scripted_text, blip, bip)
+                failure, scripted_text, blip, bip, music)
 
             /*
     std::vector<sf::SoundBuffer *> swordSnds, maceSnds, spearSnds;
