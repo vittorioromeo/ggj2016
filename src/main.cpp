@@ -1588,6 +1588,8 @@ GGJ16_NAMESPACE
 
     struct title_screen : public game_screen
     {
+        float _safety{50};
+
         ssvs::BitmapTextRich _t_cs{*assets().fontObBig};
         ssvs::BitmapTextRich _t_cs2{*assets().fontObStroked};
 
@@ -1610,7 +1612,15 @@ GGJ16_NAMESPACE
 
         void update(ft dt) override
         {
-            if(app().lb_down()) on_start();
+            if(_safety >= 0.f)
+            {
+                _safety -= dt;
+            }
+            else if(app().lb_down())
+            {
+                on_start();
+                _safety = 50.f;
+            }
 
             ssvs::setOrigin(_t_cs, ssvs::getLocalCenter);
             ssvs::setOrigin(_t_cs2, ssvs::getLocalCenter);
@@ -1972,16 +1982,13 @@ int main()
     cenemy_state es_d0{assets().d0};
     es_d0._f_ai = first_ai();
 
-
     battle_participant demon1{cs_demon1};
     cenemy_state es_d1{assets().d1};
     es_d1._f_ai = second_ai();
 
-
     battle_participant demon2{cs_demon2};
     cenemy_state es_d2{assets().d2};
     es_d2._f_ai = third_ai();
-
 
     battle_participant demon3{cs_demon3};
     cenemy_state es_d3{assets().d3};
@@ -2014,13 +2021,6 @@ int main()
         s_battle.reset();
         app.push_screen(s_battle);
     };
-
-    /*
-    battle_context_t bc0{ps, es_d0, b0};
-    battle_context_t bc1{ps, es_d1, b1};
-    battle_context_t bc2{ps, es_d2, b2};
-    battle_context_t bc3{ps, es_d3, b3};
-    */
 
     auto& s_title(app.make_screen<title_screen>());
     s_title.on_start = [battle_set]() mutable
