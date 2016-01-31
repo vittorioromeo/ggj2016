@@ -30,7 +30,8 @@ GGJ16_NAMESPACE
             CACHE_ASSETS(ssvs::BitmapFont, "", fontObStroked, fontObBig)
 
             // Textures
-            CACHE_ASSETS(sf::Texture, ".png", landscape, d0, d1, d2, d3,bar)
+            CACHE_ASSETS(
+                sf::Texture, ".png", landscape, d0, d1, d2, d3, bar, title)
 
             // Sounds
             CACHE_ASSETS(sf::SoundBuffer, ".ogg", click0, enemy_atk0,

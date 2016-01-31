@@ -1591,11 +1591,16 @@ GGJ16_NAMESPACE
         float _safety{50};
 
         ssvs::BitmapTextRich _t_cs{*assets().fontObBig};
-        ssvs::BitmapTextRich _t_cs2{*assets().fontObStroked};
+        ssvs::BitmapTextRich _t_cs2{*assets().fontObBig};
+
+        sf::Sprite _bg{*assets().title};
 
         std::function<void()> on_start;
         title_screen(game_app& app) : game_screen(app)
         {
+            _bg.setPosition(0.f, 0.f);
+
+
             _t_cs.eff<BTR::Tracking>(-3)
                 .eff(sfc::Red)
                 .eff<BTR::Wave>(1.5f, 0.03f)
@@ -1607,7 +1612,7 @@ GGJ16_NAMESPACE
                 .in("Press LMB to play.");
 
             _t_cs.setScale(vec2f(3.f, 3.f));
-            _t_cs2.setScale(vec2f(3.f, 3.f));
+            _t_cs2.setScale(vec2f(2.f, 2.f));
         }
 
         void update(ft dt) override
@@ -1630,14 +1635,15 @@ GGJ16_NAMESPACE
             _t_cs.update(dt);
 
             _t_cs2.setPosition(game_constants::width / 2.f,
-                game_constants::height / 2.f + 30.f);
+                game_constants::height / 2.f + 200.f);
 
             _t_cs2.update(dt);
         }
 
         void draw() override
         {
-            app().render(_t_cs);
+            app().render(_bg);
+            // app().render(_t_cs);
             app().render(_t_cs2);
         }
     };
@@ -1688,7 +1694,7 @@ void fill_ps(ggj16::cplayer_state& ps)
     ps.emplace_atk_ritual<symbol_ritual>("Obliterate",
         "Hard ritual.\nConnect the dots.\nMassive HP damage.\nLow shield "
         "damage.",
-        ritual_type::complete, 3, 50,
+        ritual_type::complete, 4, 50,
         [](symbol_ritual& sr)
         {
             auto x(-1024 / 2.f);
@@ -1784,7 +1790,7 @@ void fill_ps(ggj16::cplayer_state& ps)
 
 
     ps.emplace_mana_ritual<aura_ritual>("Restore mana",
-        "Medium ritual.\nRestores your mana.", ritual_type::resist, 6, 0,
+        "Medium ritual.\nRestores your mana.", ritual_type::resist, 4, 0,
         [](aura_ritual& sr)
         {
             auto offset(30.f);
@@ -1846,7 +1852,7 @@ auto second_ai()
             bc.heal_enemy_by(12);
             bc.damage_enemy_shield_by(4);
         }
-        else if(ps.shield() >= ps.shield() * 0.8)
+        else if(ps.shield() >= ps.maxshield() * 0.8)
         {
             bs.display_msg_box("The demon performs\nan armor-piercing attack!");
             bc.damage_player_shield_by(20);
@@ -1884,7 +1890,7 @@ auto third_ai()
             bc.heal_enemy_shield_by(10);
             bc.damage_enemy_by(5);
         }
-        else if(ps.shield() >= ps.shield() * 0.7)
+        else if(ps.shield() >= ps.maxshield() * 0.7)
         {
             bs.display_msg_box("The demon performs\nan armor-piercing attack!");
             bc.damage_player_shield_by(25);
@@ -1922,7 +1928,7 @@ auto fourth_ai()
             bc.heal_enemy_shield_by(20);
             bc.damage_enemy_by(5);
         }
-        else if(ps.shield() >= ps.shield() * 0.6)
+        else if(ps.shield() >= ps.maxshield() * 0.6)
         {
             bs.display_msg_box("The demon performs\nan armor-piercing attack!");
             bc.damage_player_shield_by(30);
@@ -1945,7 +1951,7 @@ int main()
 
     using game_app_runner = boilerplate::app_runner<game_app>;
     game_app_runner game{
-        "ggj2016 temp", game_constants::width, game_constants::height};
+        "Demon Cleansing", game_constants::width, game_constants::height};
     game_app& app(game.app());
 
     character_stats cs_demon0;
